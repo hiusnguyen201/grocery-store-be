@@ -10,7 +10,11 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1');
 
   // Enable Validation Pipe
-  app.useGlobalPipes(new ValidationPipe());
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+    }),
+  );
 
   // Cors
   app.enableCors();

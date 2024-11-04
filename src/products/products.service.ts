@@ -7,7 +7,6 @@ import { isUUID } from 'class-validator';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { Product } from './schemas/product.schema';
-import responseMessage from 'src/constants/responseMessage';
 
 @Injectable()
 export class ProductsService {
@@ -44,9 +43,6 @@ export class ProductsService {
     updateProductDto: UpdateProductDto,
   ): Promise<Product> {
     const product = await this.findOne(id);
-
-    if (!product)
-      throw new NotFoundException(responseMessage.PRODUCT.PRODUCT_NOT_FOUND);
 
     return await this.productModel.findByIdAndUpdate(id, updateProductDto, {
       new: true,

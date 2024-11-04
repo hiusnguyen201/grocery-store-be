@@ -8,7 +8,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ProductsModule } from './products/products.module';
-
+import { UsersModule } from './users/users.module';
 import config from './config/configuration';
 
 @Module({
@@ -35,6 +35,7 @@ import config from './config/configuration';
         limit: 10,
       },
     ]),
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [
