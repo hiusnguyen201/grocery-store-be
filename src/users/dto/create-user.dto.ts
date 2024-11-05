@@ -4,6 +4,7 @@ import {
   MaxLength,
   IsEmail,
   IsIn,
+  IsOptional,
 } from 'class-validator';
 
 import { EUserRoles } from 'src/constants/common';
@@ -24,8 +25,8 @@ export class CreateUserDto {
   @MaxLength(32)
   password: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
   @IsIn(Object.values(EUserRoles))
-  role: EUserRoles;
+  role?: EUserRoles;
 }

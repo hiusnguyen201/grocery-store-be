@@ -19,7 +19,7 @@ export class ProductsController {
   @Post()
   async create(@Body() createProductDto: CreateProductDto) {
     const product = await this.productService.create(createProductDto);
-    return { data: product };
+    return { product };
   }
 
   @Get()
@@ -28,13 +28,13 @@ export class ProductsController {
     @Query('status') status?: 'OUT_OF_STOCK' | 'IN_STOCK',
   ) {
     const products = await this.productService.findAll();
-    return { data: products };
+    return { products };
   }
 
   @Get(':id')
   async findOne(@Param('id') id: string) {
     const product = await this.productService.findOne(id);
-    return { data: product };
+    return { product };
   }
 
   @Patch(':id')
@@ -43,12 +43,12 @@ export class ProductsController {
     @Body() updateProductDto: UpdateProductDto,
   ) {
     const product = await this.productService.update(id, updateProductDto);
-    return { data: product };
+    return { product };
   }
 
   @Delete(':id')
   async delete(@Param('id') id: string) {
     const product = await this.productService.delete(id);
-    return { data: product };
+    return { product };
   }
 }

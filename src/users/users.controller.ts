@@ -8,18 +8,73 @@ import {
   Delete,
   UseInterceptors,
   UploadedFile,
+  Query,
+  HttpStatus,
+  HttpException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { imageFileFilter, MAX_UPLOAD_FILE_SIZE } from 'src/utils/upload.util';
+import { FindAllUserDto } from './dto/findAll-user.dto';
+import { imageFileFilter, MAX_UPLOAD_FILE_SIZE } from 'src/utils/upload';
+import { MESSAGE_SUCCESS } from 'src/constants/messages';
 
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
+  async create(@Body() createUserDto: CreateUserDto) {
+    const user = await this.usersService.create(createUserDto);
+    return {
+      statusCode: HttpStatus.CREATED,
+      message: MESSAGE_SUCCESS.CREATE_USER_SUCCESS,
+      data: user,
+    };
+  }
+
+  @Get()
+  async findAll(@Query() queryString: FindAllUserDto) {
+    const data = await this.usersService.findAll(queryString);
+    return {
+      statusCode: HttpStatus.OK,
+      message: MESSAGE_SUCCESS.GET_ALL_USERS_SUCCESS,
+      data,
+    };
+  }
+
+  @Get(':id')
+  async findOne(@Param('id') id: string) {
+    const user = await this.usersService.findOne(id);
+    return {
+      statusCode: HttpStatus.OK,
+      message: MESSAGE_SUCCESS.GET_USER_SUCCESS,
+      data: user,
+    };
+  }
+
+  @Patch(':id')
+  async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
+    const user = await this.usersService.updateInfo(id, updateUserDto);
+    return {
+      statusCode: HttpStatus.OK,
+      message: MESSAGE_SUCCESS.UPDATE_USER_SUCCESS,
+      data: user,
+    };
+  }
+
+  @Delete(':id')
+  async remove(@Param('id') id: string) {
+    const user = await this.usersService.remove(id);
+    return {
+      statusCode: HttpStatus.OK,
+      message: MESSAGE_SUCCESS.REMOVE_USER_SUCCESS,
+      data: user,
+    };
+  }
+
+  @Patch(':id/avatar')
   @UseInterceptors(
     FileInterceptor('avatar', {
       limits: {
@@ -28,31 +83,15 @@ export class UsersController {
       fileFilter: imageFileFilter,
     }),
   )
-  async create(
-    @Body() createUserDto: CreateUserDto,
-    @UploadedFile()
-    file: Express.Multer.File,
+  async updateAvatar(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
   ) {
-    return this.usersService.create(createUserDto, file);
-  }
-
-  @Get()
-  async findAll() {
-    return this.usersService.findAll();
-  }
-
-  @Get(':id')
-  async findOne(@Param('id') id: string) {
-    return this.usersService.findOne(id);
-  }
-
-  @Patch(':id')
-  async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.usersService.update(id, updateUserDto);
-  }
-
-  @Delete(':id')
-  async remove(@Param('id') id: string) {
-    return this.usersService.remove(id);
+    const user = await this.usersService.updateAvatar(id, file);
+    return {
+      statusCode: HttpStatus.OK,
+      message: MESSAGE_SUCCESS.UPDATE_USER_SUCCESS,
+      data: user,
+    };
   }
 }
