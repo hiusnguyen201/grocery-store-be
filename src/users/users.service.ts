@@ -14,15 +14,19 @@ import { MESSAGE_ERROR } from 'src/constants/messages';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { makeHash } from 'src/utils/bcrypt.util';
 import { FindAllUserDto } from './dto/find-all-user.dto';
-import { EUserRoles, PER_PAGE } from 'src/constants/common';
+import { PER_PAGE } from 'src/constants/common';
 import { isValidObjectId } from 'src/utils/validation.util';
 import { PageMetaDto } from 'src/dtos/page-meta.dto';
+import { RegisterAuthDto } from 'src/auth/dto/register-auth.dto';
+import { randomString } from 'src/utils/string.utils';
+import { MailService } from 'src/mail/mail.service';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
     private cloudinaryService: CloudinaryService,
+    private mailService: MailService,
   ) {}
 
   /**
@@ -36,12 +40,15 @@ export class UsersService {
       throw new BadRequestException(MESSAGE_ERROR.EMAIL_EXIST);
     }
 
-    const hashedPassword = await makeHash('1234');
+    const passwordGenerate = randomString(8);
+    const hashedPassword = await makeHash(passwordGenerate);
     const newUser = await this.userModel.create({
       _id: new mongoose.Types.ObjectId(),
       ...createUserDto,
       password: hashedPassword,
     });
+
+    this.mailService.sendPassword(newUser.email, passwordGenerate);
 
     // Return user without password
     return await this.findOne(newUser._id);
@@ -203,5 +210,40 @@ export class UsersService {
       .select('email');
 
     return !!user;
+  }
+
+  /**
+   * Register user
+   * @param registerAuthDto
+   * @param file
+   * @returns
+   */
+  async register(
+    registerAuthDto: RegisterAuthDto,
+    file?: Express.Multer.File,
+  ): Promise<User> {
+    if (await this.isExistEmail(registerAuthDto.email)) {
+      throw new BadRequestException(MESSAGE_ERROR.EMAIL_EXIST);
+    }
+
+    const hashedPassword = await makeHash(registerAuthDto.password);
+    const newUser = await this.userModel.create({
+      _id: new mongoose.Types.ObjectId(),
+      ...registerAuthDto,
+      password: hashedPassword,
+    });
+
+    if (file) {
+      const fileName = `${file.originalname}-${new Date().getTime()}`;
+      this.cloudinaryService
+        .uploadImageBuffer(file.buffer, `avatars/${newUser._id}`, fileName)
+        .then(async (result) => {
+          await this.userModel.findByIdAndUpdate(newUser._id, {
+            avatar: result.url,
+          });
+        });
+    }
+
+    return await this.findOne(newUser._id);
   }
 }

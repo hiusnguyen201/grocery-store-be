@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { LoginAuthDto } from './dto/login-auth.dto';
 import { RegisterAuthDto } from './dto/register-auth.dto';
 import { UsersService } from 'src/users/users.service';
@@ -30,13 +34,16 @@ export class AuthService {
     const accessToken: string = await this.jwtService.signAsync(
       { _id: user._id },
       {
-        expiresIn: this.configService.get('jwt.expiryTime'),
+        expiresIn: this.configService.get<string>('jwt.expiryTime'),
       },
     );
     return { accessToken, user: await this.usersService.findOne(user._id) };
   }
 
-  async register(registerAuthDto: RegisterAuthDto) {
-    return `This action returns a auth`;
+  async registerUser(
+    registerAuthDto: RegisterAuthDto,
+    file?: Express.Multer.File,
+  ): Promise<User> {
+    return await this.usersService.register(registerAuthDto, file);
   }
 }

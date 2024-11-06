@@ -6,8 +6,11 @@ import { Readable } from 'stream';
 @Injectable()
 export class CloudinaryService {
   constructor(private configService: ConfigService) {
-    const { cloudName, apiKey, apiSecret } =
-      this.configService.get('cloudinary');
+    const { cloudName, apiKey, apiSecret } = this.configService.get<{
+      cloudName: string;
+      apiKey: string;
+      apiSecret: string;
+    }>('cloudinary');
 
     cloudinary.config({
       cloud_name: cloudName,
