@@ -20,11 +20,6 @@ export class CreateUserDto {
   @MaxLength(200)
   email: string;
 
-  @IsNotEmpty()
-  @IsString()
-  @MaxLength(32)
-  password: string;
-
   @IsOptional()
   @IsString()
   @IsIn(Object.values(EUserRoles))

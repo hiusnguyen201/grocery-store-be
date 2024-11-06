@@ -3,19 +3,20 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { InjectModel } from '@nestjs/mongoose';
 import { isEmail } from 'class-validator';
-import mongoose, { Model } from 'mongoose';
-
+import mongoose, { FilterQuery, Model, RootFilterQuery } from 'mongoose';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './schemas/user.schema';
 import { MESSAGE_ERROR } from 'src/constants/messages';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
-import { makeHash } from 'src/utils/bcrypt';
-import { FindAllUserDto } from './dto/findAll-user.dto';
-import { EUserRoles } from 'src/constants/common';
-import { isValidObjectId } from 'src/utils/validation';
+import { makeHash } from 'src/utils/bcrypt.util';
+import { FindAllUserDto } from './dto/find-all-user.dto';
+import { EUserRoles, PER_PAGE } from 'src/constants/common';
+import { isValidObjectId } from 'src/utils/validation.util';
+import { PageMetaDto } from 'src/dtos/page-meta.dto';
 
 @Injectable()
 export class UsersService {
@@ -30,12 +31,12 @@ export class UsersService {
    * @param file
    * @returns
    */
-  async create(createUserDto: CreateUserDto) {
+  async create(createUserDto: CreateUserDto): Promise<User> {
     if (await this.isExistEmail(createUserDto.email)) {
       throw new BadRequestException(MESSAGE_ERROR.EMAIL_EXIST);
     }
 
-    const hashedPassword = await makeHash(createUserDto.password);
+    const hashedPassword = await makeHash('1234');
     const newUser = await this.userModel.create({
       _id: new mongoose.Types.ObjectId(),
       ...createUserDto,
@@ -51,10 +52,8 @@ export class UsersService {
    * @param role
    * @returns
    */
-  async countAll(role?: EUserRoles) {
-    return await this.userModel.countDocuments({
-      role,
-    });
+  private async countAll(filterQuery: FilterQuery<User>): Promise<number> {
+    return await this.userModel.countDocuments(filterQuery);
   }
 
   /**
@@ -62,36 +61,37 @@ export class UsersService {
    * @param queryString
    * @returns
    */
-  async findAll(queryString: FindAllUserDto) {
-    const { page = 1, limit = 10, keyword = '' } = queryString;
+  async findAll(
+    req: Request,
+    query: FindAllUserDto,
+  ): Promise<{ meta: PageMetaDto; users: User[] }> {
+    const {
+      page = 1,
+      limit = PER_PAGE[0],
+      keyword = '',
+      status = null,
+    } = query;
 
-    const totalCount = await this.countAll();
-    const totalPage = Math.ceil(totalCount / +limit);
-    const offset = (+page - 1) * +limit;
+    const filterQuery: RootFilterQuery<User> = {
+      $or: [
+        { name: { $regex: keyword, $options: 'i' } }, // Option "i" - Search lowercase and uppercase
+        { email: { $regex: keyword, $options: 'i' } },
+      ],
+
+      [status && 'status']: status,
+    };
+
+    const totalCount = await this.countAll(filterQuery);
+
+    const pageMetaDto = new PageMetaDto({ req, limit, page, totalCount });
 
     const users = await this.userModel
-      .find({
-        $or: [
-          { name: { $regex: keyword, $options: 'i' } }, // Option "i" - Search lowercase and uppercase
-          { email: { $regex: keyword, $options: 'i' } },
-        ],
-      })
-      .skip(offset)
-      .limit(+limit)
+      .find(filterQuery)
+      .skip(pageMetaDto.offset)
+      .limit(limit)
       .select('-password');
 
-    return {
-      users,
-      meta: {
-        page,
-        offset,
-        limit,
-        totalPage,
-        totalCount,
-        isNext: +page < totalPage,
-        isPrevious: +page > 1,
-      },
-    };
+    return { meta: pageMetaDto, users };
   }
 
   /**
@@ -99,7 +99,7 @@ export class UsersService {
    * @param id
    * @returns
    */
-  async findOne(id: string) {
+  async findOne(id: string, selectFields: string = '-password'): Promise<User> {
     const filter: Partial<User> = {};
 
     if (isValidObjectId(id)) {
@@ -110,7 +110,7 @@ export class UsersService {
       return null;
     }
 
-    return await this.userModel.findOne(filter).select('-password');
+    return await this.userModel.findOne(filter).select(selectFields);
   }
 
   /**
@@ -119,7 +119,7 @@ export class UsersService {
    * @param updateUserDto
    * @returns
    */
-  async updateInfo(id: string, updateUserDto: UpdateUserDto) {
+  async updateInfo(id: string, updateUserDto: UpdateUserDto): Promise<User> {
     if (await this.isExistEmail(updateUserDto.email, id)) {
       throw new BadRequestException(MESSAGE_ERROR.EMAIL_EXIST);
     }
@@ -139,7 +139,7 @@ export class UsersService {
    * @param id
    * @param file
    */
-  async updateAvatar(id: string, file: Express.Multer.File) {
+  async updateAvatar(id: string, file: Express.Multer.File): Promise<User> {
     if (!file) {
       throw new BadRequestException(MESSAGE_ERROR.FILE_NOT_FOUND);
     }
@@ -155,8 +155,16 @@ export class UsersService {
       `avatars/${user._id}`,
       fileName,
     );
-    user.avatar = result.url;
-    return await user.save();
+
+    return await this.userModel.findByIdAndUpdate(
+      id,
+      {
+        avatar: result.url,
+      },
+      {
+        new: true,
+      },
+    );
   }
 
   /**
@@ -164,7 +172,7 @@ export class UsersService {
    * @param id
    * @returns
    */
-  async remove(id: string) {
+  async remove(id: string): Promise<User> {
     const user = await this.findOne(id);
     if (!user) {
       throw new NotFoundException(MESSAGE_ERROR.USER_NOT_FOUND);
@@ -179,7 +187,7 @@ export class UsersService {
    * @param skipId
    * @returns
    */
-  async isExistEmail(email: string, skipId?: string) {
+  async isExistEmail(email: string, skipId?: string): Promise<boolean> {
     const extras: any = {};
     if (skipId) {
       extras._id = {
@@ -187,11 +195,13 @@ export class UsersService {
       };
     }
 
-    return await this.userModel
+    const user = await this.userModel
       .findOne({
         email,
         ...extras,
       })
       .select('email');
+
+    return !!user;
   }
 }

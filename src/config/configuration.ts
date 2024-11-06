@@ -9,4 +9,9 @@ export default () => ({
     apiKey: env.CLOUD_API_KEY,
     apiSecret: env.CLOUD_API_SECRET,
   },
+
+  jwt: {
+    expiryTime: env.JWT_EXPIRY_TIME || '7d',
+    secret: env.JWT_SECRET,
+  },
 });

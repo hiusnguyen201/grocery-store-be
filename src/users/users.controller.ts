@@ -10,15 +10,17 @@ import {
   UploadedFile,
   Query,
   HttpStatus,
-  HttpException,
+  Req,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { FindAllUserDto } from './dto/findAll-user.dto';
-import { imageFileFilter, MAX_UPLOAD_FILE_SIZE } from 'src/utils/upload';
+import { FindAllUserDto } from './dto/find-all-user.dto';
+import { imageFileFilter, MAX_UPLOAD_FILE_SIZE } from 'src/utils/upload.util';
 import { MESSAGE_SUCCESS } from 'src/constants/messages';
+import { UrlInterceptor } from 'src/interceptors/url.interceptor';
 
 @Controller('users')
 export class UsersController {
@@ -35,8 +37,10 @@ export class UsersController {
   }
 
   @Get()
-  async findAll(@Query() queryString: FindAllUserDto) {
-    const data = await this.usersService.findAll(queryString);
+  @UseInterceptors(UrlInterceptor)
+  async findAll(@Req() req: Request, @Query() query: FindAllUserDto) {
+    const data = await this.usersService.findAll(req, query);
+
     return {
       statusCode: HttpStatus.OK,
       message: MESSAGE_SUCCESS.GET_ALL_USERS_SUCCESS,

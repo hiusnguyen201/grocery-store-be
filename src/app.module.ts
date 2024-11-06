@@ -9,6 +9,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ProductsModule } from './products/products.module';
 import { UsersModule } from './users/users.module';
+import { AuthModule } from './auth/auth.module';
 import config from './config/configuration';
 
 @Module({
@@ -22,7 +23,7 @@ import config from './config/configuration';
     // Database
     MongooseModule.forRootAsync({
       useFactory: (configService: ConfigService) => ({
-        uri: configService.get<string>('mongoUri'),
+        uri: configService.get('mongoUri'),
       }),
       inject: [ConfigService],
     }),
@@ -32,10 +33,11 @@ import config from './config/configuration';
     ThrottlerModule.forRoot([
       {
         ttl: 60000, // 1 min
-        limit: 10,
+        limit: 15,
       },
     ]),
     UsersModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [

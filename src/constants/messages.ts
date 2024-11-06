@@ -18,4 +18,8 @@ export const MESSAGE_SUCCESS = {
   GET_USER_SUCCESS: 'Get user successfully',
   UPDATE_USER_SUCCESS: 'Update user successfully',
   REMOVE_USER_SUCCESS: 'Remove user successfully',
+
+  // Auth
+  LOGIN_SUCCESS: 'Login successfully',
+  REGISTER_SUCCESS: 'Register successfully',
 };
