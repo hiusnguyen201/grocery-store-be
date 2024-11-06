@@ -5,7 +5,7 @@ import { ISendMailOptions, MailerService } from '@nestjs-modules/mailer';
 export class MailService {
   constructor(private readonly mailerService: MailerService) {}
 
-  async sendAsync(
+  private async sendAsync(
     featureName: string,
     sendMailOptions: ISendMailOptions,
   ): Promise<void> {
@@ -24,6 +24,16 @@ export class MailService {
       context: {
         password,
       },
+    });
+  }
+
+  async sendWelcome(email: string, senderName: string): Promise<void> {
+    const FEATURE_NAME = 'SEND_WELCOME';
+
+    await this.sendAsync(FEATURE_NAME, {
+      to: email,
+      subject: `Welcome to ${senderName} ✔`,
+      template: 'send-welcome',
     });
   }
 }

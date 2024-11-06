@@ -20,6 +20,7 @@ import { PageMetaDto } from 'src/dtos/page-meta.dto';
 import { RegisterAuthDto } from 'src/auth/dto/register-auth.dto';
 import { randomString } from 'src/utils/string.utils';
 import { MailService } from 'src/mail/mail.service';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class UsersService {
@@ -27,6 +28,7 @@ export class UsersService {
     @InjectModel(User.name) private userModel: Model<User>,
     private cloudinaryService: CloudinaryService,
     private mailService: MailService,
+    private configService: ConfigService,
   ) {}
 
   /**
@@ -243,6 +245,11 @@ export class UsersService {
           });
         });
     }
+
+    this.mailService.sendWelcome(
+      newUser.email,
+      this.configService.get('projectName'),
+    );
 
     return await this.findOne(newUser._id);
   }
