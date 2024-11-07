@@ -6,9 +6,9 @@ export default () => ({
   mongoUri: env.MONGO_URI || 'mongodb://localhost:27017/grocery-store',
 
   cloudinary: {
-    cloudName: env.CLOUD_NAME,
-    apiKey: env.CLOUD_API_KEY,
-    apiSecret: env.CLOUD_API_SECRET,
+    cloudName: env.CLOUDINARY_NAME,
+    apiKey: env.CLOUDINARY_API_KEY,
+    apiSecret: env.CLOUDINARY_API_SECRET,
   },
 
   jwt: {

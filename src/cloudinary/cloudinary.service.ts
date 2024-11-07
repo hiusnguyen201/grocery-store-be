@@ -6,16 +6,10 @@ import { Readable } from 'stream';
 @Injectable()
 export class CloudinaryService {
   constructor(private configService: ConfigService) {
-    const { cloudName, apiKey, apiSecret } = this.configService.get<{
-      cloudName: string;
-      apiKey: string;
-      apiSecret: string;
-    }>('cloudinary');
-
     cloudinary.config({
-      cloud_name: cloudName,
-      api_key: apiKey,
-      api_secret: apiSecret,
+      cloud_name: this.configService.get('cloudinary.cloudName'),
+      api_key: this.configService.get('cloudinary.apiKey'),
+      api_secret: this.configService.get('cloudinary.apiSecret'),
     });
   }
 
@@ -46,6 +40,18 @@ export class CloudinaryService {
           },
         ),
       );
+    });
+  }
+
+  async uploadFile(
+    filePath: string,
+    folder: string,
+    fileName: string,
+  ): Promise<UploadApiResponse> {
+    return await cloudinary.uploader.upload(filePath, {
+      folder,
+      public_id: fileName,
+      resource_type: 'raw',
     });
   }
 }

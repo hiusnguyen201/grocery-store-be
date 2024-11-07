@@ -12,6 +12,8 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { MailModule } from './mail/mail.module';
 import config from './config/configuration';
+import { ScheduleModule } from '@nestjs/schedule';
+import { CloudinaryService } from './cloudinary/cloudinary.service';
 
 @Module({
   imports: [
@@ -24,12 +26,11 @@ import config from './config/configuration';
     // Database
     MongooseModule.forRootAsync({
       useFactory: (configService: ConfigService) => ({
-        uri: configService.get<string>('mongoUri'),
+        uri: configService.get('mongoUri'),
       }),
       inject: [ConfigService],
     }),
-    // Routes
-    ProductsModule,
+    ScheduleModule.forRoot(),
     // Rate Limit
     ThrottlerModule.forRoot([
       {
@@ -37,6 +38,8 @@ import config from './config/configuration';
         limit: 15,
       },
     ]),
+    // Routes
+    ProductsModule,
     UsersModule,
     AuthModule,
     MailModule,
@@ -48,6 +51,7 @@ import config from './config/configuration';
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
+    CloudinaryService,
   ],
 })
 export class AppModule {}
