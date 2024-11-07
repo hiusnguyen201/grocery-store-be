@@ -3,7 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { spawn } from 'child_process';
 import { existsSync, mkdirSync, unlinkSync } from 'fs';
-import { CloudinaryService } from './cloudinary/cloudinary.service';
+import {
+  CloudinaryService,
+  UploadPathFile,
+} from './cloudinary/cloudinary.service';
 
 @Injectable()
 export class AppService {
@@ -12,6 +15,8 @@ export class AppService {
     private cloudinaryService: CloudinaryService,
   ) {}
 
+  // Must install MongoDB Command Line Database Tools.
+  // More details cli: https://www.mongodb.com/docs/database-tools/mongodump
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   backupDatabase() {
     const fileName = `${new Date().getTime()}-db`;
@@ -30,7 +35,7 @@ export class AppService {
     child.on('exit', async (code, signal) => {
       if (!code && !signal) {
         try {
-          const result = await this.cloudinaryService.uploadFile(
+          const result = await this.cloudinaryService.saveBackupDB(
             filePath,
             'database',
             fileName,

@@ -1,6 +1,13 @@
-import { IPageMetaDtoParameters } from 'src/constants/interfaces';
+import { Request } from 'express';
 
 export const PAGE_KEY = 'page';
+
+export type PageMetaDtoParameters = {
+  req: Request;
+  page: number;
+  limit: number;
+  totalCount: number;
+};
 
 export class PageMetaDto {
   readonly page: number;
@@ -21,7 +28,7 @@ export class PageMetaDto {
 
   readonly nextUrl: string | null;
 
-  constructor({ req, page, limit, totalCount }: IPageMetaDtoParameters) {
+  constructor({ req, page, limit, totalCount }: PageMetaDtoParameters) {
     this.page = +page;
     this.limit = +limit;
     this.totalCount = +totalCount;

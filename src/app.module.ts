@@ -1,8 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { MongooseModule } from '@nestjs/mongoose';
-import { ConfigService } from '@nestjs/config';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 
 import { AppController } from './app.controller';
@@ -12,8 +10,12 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { MailModule } from './mail/mail.module';
 import config from './config/configuration';
-import { ScheduleModule } from '@nestjs/schedule';
 import { CloudinaryService } from './cloudinary/cloudinary.service';
+import { databaseConfig } from './config/database';
+import { queueConfig } from './config/queue';
+import { throttlerConfig } from './config/throttler';
+import { scheduleConfig } from './config/schedule';
+import { CloudinaryModule } from './cloudinary/cloudinary.module';
 
 @Module({
   imports: [
@@ -24,25 +26,20 @@ import { CloudinaryService } from './cloudinary/cloudinary.service';
       load: [config],
     }),
     // Database
-    MongooseModule.forRootAsync({
-      useFactory: (configService: ConfigService) => ({
-        uri: configService.get('mongoUri'),
-      }),
-      inject: [ConfigService],
-    }),
-    ScheduleModule.forRoot(),
+    databaseConfig,
+    // Schedules
+    scheduleConfig,
+    // Queues
+    queueConfig,
     // Rate Limit
-    ThrottlerModule.forRoot([
-      {
-        ttl: 60000, // 1 min
-        limit: 15,
-      },
-    ]),
-    // Routes
+    throttlerConfig,
+
+    //Modules
     ProductsModule,
     UsersModule,
     AuthModule,
     MailModule,
+    CloudinaryModule,
   ],
   controllers: [AppController],
   providers: [
@@ -51,7 +48,6 @@ import { CloudinaryService } from './cloudinary/cloudinary.service';
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
-    CloudinaryService,
   ],
 })
 export class AppModule {}

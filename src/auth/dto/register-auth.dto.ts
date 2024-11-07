@@ -1,7 +1,7 @@
 import { IntersectionType } from '@nestjs/mapped-types';
 import { LoginAuthDto } from './login-auth.dto';
 import { IsNotEmpty, IsString, MaxLength, Validate } from 'class-validator';
-import { Match } from 'src/decorators/match.decorator';
+import { Match } from 'src/validators/match.validator';
 
 export class RegisterAuthDto extends IntersectionType(LoginAuthDto) {
   @IsNotEmpty()

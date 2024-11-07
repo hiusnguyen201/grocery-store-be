@@ -1,11 +1,25 @@
+import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Queue } from 'bullmq';
 import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
 import { Readable } from 'stream';
 
+type UploadFile = {
+  folder: string;
+  fileName: string;
+  resourceType: 'image' | 'video' | 'raw' | 'auto';
+};
+
+export type UploadBufferFile = UploadFile & { file: Buffer };
+export type UploadPathFile = UploadFile & { file: string };
+
 @Injectable()
 export class CloudinaryService {
-  constructor(private configService: ConfigService) {
+  constructor(
+    @InjectQueue(CloudinaryService.name) private readonly uploadQueue: Queue,
+    private configService: ConfigService,
+  ) {
     cloudinary.config({
       cloud_name: this.configService.get('cloudinary.cloudName'),
       api_key: this.configService.get('cloudinary.apiKey'),
@@ -13,28 +27,29 @@ export class CloudinaryService {
     });
   }
 
-  async uploadImageBuffer(
-    fileBuffer: Buffer,
-    folder: string,
-    fileName: string,
+  private async uploadBuffer(
+    jobName: string,
+    upload: UploadBufferFile,
   ): Promise<UploadApiResponse> {
+    const job = await this.uploadQueue.add(jobName, upload);
     return new Promise((resolve, reject) => {
       const readableStream = new Readable();
-      readableStream.push(fileBuffer);
+      readableStream.push(upload.file);
       readableStream.push(null);
 
       // Use upload_stream to upload the Readable stream
       readableStream.pipe(
         cloudinary.uploader.upload_stream(
           {
-            resource_type: 'image',
-            folder,
-            public_id: fileName,
+            resource_type: upload.resourceType,
+            folder: upload.folder,
+            public_id: upload.fileName,
           },
-          (err, result) => {
+          async (err, result) => {
             if (err) {
               reject(err);
             } else {
+              await job.remove();
               resolve(result);
             }
           },
@@ -43,15 +58,45 @@ export class CloudinaryService {
     });
   }
 
-  async uploadFile(
-    filePath: string,
-    folder: string,
-    fileName: string,
+  private async uploadFile(
+    jobName: string,
+    upload: UploadPathFile,
   ): Promise<UploadApiResponse> {
-    return await cloudinary.uploader.upload(filePath, {
-      folder,
-      public_id: fileName,
-      resource_type: 'raw',
+    const job = await this.uploadQueue.add(jobName, upload);
+    return new Promise((resolve, reject) => {
+      cloudinary.uploader
+        .upload(upload.file, {
+          folder: upload.folder,
+          public_id: upload.fileName,
+          resource_type: upload.resourceType,
+        })
+        .then(async (result) => {
+          await job.remove();
+          resolve(result);
+        })
+        .catch((err) => reject(err));
     });
+  }
+
+  async saveAvatar(fileBuffer: Buffer, folder: string, fileName: string) {
+    const JOB_NAME = 'UPLOAD_AVATAR';
+    const upload: UploadBufferFile = {
+      file: fileBuffer,
+      folder,
+      fileName,
+      resourceType: 'image',
+    };
+    return await this.uploadBuffer(JOB_NAME, upload);
+  }
+
+  async saveBackupDB(filePath: string, folder: string, fileName: string) {
+    const JOB_NAME = 'UPLOAD_BACKUP_DB';
+    const upload: UploadPathFile = {
+      file: filePath,
+      folder,
+      fileName,
+      resourceType: 'raw',
+    };
+    return await this.uploadFile(JOB_NAME, upload);
   }
 }

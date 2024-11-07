@@ -11,7 +11,10 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './schemas/user.schema';
 import { MESSAGE_ERROR } from 'src/constants/messages';
-import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
+import {
+  CloudinaryService,
+  UploadBufferFile,
+} from 'src/cloudinary/cloudinary.service';
 import { makeHash } from 'src/utils/bcrypt.util';
 import { FindAllUserDto } from './dto/find-all-user.dto';
 import { PER_PAGE } from 'src/constants/common';
@@ -158,11 +161,10 @@ export class UsersService {
       throw new NotFoundException(MESSAGE_ERROR.USER_NOT_FOUND);
     }
 
-    const fileName = `${file.originalname}-${new Date().getTime()}`;
-    const result = await this.cloudinaryService.uploadImageBuffer(
+    const result = await this.cloudinaryService.saveAvatar(
       file.buffer,
       `avatars/${user._id}`,
-      fileName,
+      `${file.originalname}-${new Date().getTime()}`,
     );
 
     return await this.userModel.findByIdAndUpdate(
@@ -236,9 +238,12 @@ export class UsersService {
     });
 
     if (file) {
-      const fileName = `${file.originalname}-${new Date().getTime()}`;
       this.cloudinaryService
-        .uploadImageBuffer(file.buffer, `avatars/${newUser._id}`, fileName)
+        .saveAvatar(
+          file.buffer,
+          `avatars/${newUser._id}`,
+          `${file.originalname}-${new Date().getTime()}`,
+        )
         .then(async (result) => {
           await this.userModel.findByIdAndUpdate(newUser._id, {
             avatar: result.url,

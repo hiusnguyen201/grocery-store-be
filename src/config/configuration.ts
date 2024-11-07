@@ -22,4 +22,11 @@ export default () => ({
     user: env.MAILER_AUTH_USER,
     pass: env.MAILER_AUTH_PASS,
   },
+
+  redis: {
+    host: env.REDIS_HOST,
+    port: env.REDIS_PORT,
+    username: env.REDIS_USERNAME,
+    password: env.REDIS_PASSWORD,
+  },
 });

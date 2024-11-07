@@ -4,14 +4,17 @@ import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { User, UserSchema } from './schemas/user.schema';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
-import { MailService } from 'src/mail/mail.service';
+import { MailModule } from 'src/mail/mail.module';
+import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
 
 @Module({
   imports: [
+    MailModule,
+    CloudinaryModule,
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
   ],
   controllers: [UsersController],
-  providers: [UsersService, CloudinaryService, MailService],
+  providers: [UsersService],
   exports: [UsersService],
 })
 export class UsersModule {}
