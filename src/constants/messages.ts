@@ -1,14 +1,15 @@
 export const MESSAGE_ERROR = {
-  // Product
-  PRODUCT_NOT_FOUND: 'Product not found',
-
   // User
-  EMAIL_EXIST: 'Email is existed',
+  EMAIL_EXIST: 'Email is exist',
   USER_NOT_FOUND: 'User not found',
 
   // File
   UPLOAD_FILE_ERROR: 'Upload file error',
   FILE_NOT_FOUND: 'File not found',
+
+  // Product
+  PRODUCT_NAME_EXIST: 'Product Name is exist',
+  PRODUCT_NOT_FOUND: 'Product not found',
 };
 
 export const MESSAGE_SUCCESS = {
@@ -22,4 +23,11 @@ export const MESSAGE_SUCCESS = {
   // Auth
   LOGIN_SUCCESS: 'Login successfully',
   REGISTER_SUCCESS: 'Register successfully',
+
+  // Product
+  CREATE_PRODUCT_SUCCESS: 'Create product successfully',
+  GET_ALL_PRODUCTS_SUCCESS: 'Get all products successfully',
+  GET_PRODUCT_SUCCESS: 'Get product successfully',
+  UPDATE_PRODUCT_SUCCESS: 'Update product successfully',
+  REMOVE_PRODUCT_SUCCESS: 'Remove product successfully',
 };

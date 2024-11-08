@@ -1,3 +1,5 @@
+import { FileInterceptor } from '@nestjs/platform-express';
+
 export const MAX_UPLOAD_FILE_SIZE = 1024 * 1024;
 
 export const allowImageMimeTypes = [
@@ -21,3 +23,11 @@ export const imageFileFilter = (
     cb(new Error('Invalid file type'), false);
   }
 };
+
+export const configUploadImage = (field: string) =>
+  FileInterceptor(field, {
+    limits: {
+      fileSize: MAX_UPLOAD_FILE_SIZE,
+    },
+    fileFilter: imageFileFilter,
+  });

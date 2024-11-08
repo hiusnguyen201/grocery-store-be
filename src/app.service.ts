@@ -35,10 +35,16 @@ export class AppService {
     child.on('exit', async (code, signal) => {
       if (!code && !signal) {
         try {
-          const result = await this.cloudinaryService.saveBackupDB(
+          const JOB_NAME = 'UPLOAD_BACKUP_DB';
+          const uploadInfo: UploadPathFile = {
             filePath,
-            'database',
+            folder: 'database',
             fileName,
+            resourceType: 'raw',
+          };
+          const result = await this.cloudinaryService.uploadFile(
+            JOB_NAME,
+            uploadInfo,
           );
           if (result) {
             unlinkSync(filePath);

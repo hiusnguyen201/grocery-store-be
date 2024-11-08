@@ -18,7 +18,7 @@ import {
 import { makeHash } from 'src/utils/bcrypt.util';
 import { FindAllUserDto } from './dto/find-all-user.dto';
 import { PER_PAGE } from 'src/constants/common';
-import { isValidObjectId } from 'src/utils/validation.util';
+import { isValidObjectId } from 'mongoose';
 import { PageMetaDto } from 'src/dtos/page-meta.dto';
 import { RegisterAuthDto } from 'src/auth/dto/register-auth.dto';
 import { randomString } from 'src/utils/string.utils';
@@ -64,7 +64,7 @@ export class UsersService {
    * @param role
    * @returns
    */
-  private async countAll(filterQuery: FilterQuery<User>): Promise<number> {
+  async countAll(filterQuery: FilterQuery<User>): Promise<number> {
     return await this.userModel.countDocuments(filterQuery);
   }
 
@@ -89,7 +89,6 @@ export class UsersService {
         { name: { $regex: keyword, $options: 'i' } }, // Option "i" - Search lowercase and uppercase
         { email: { $regex: keyword, $options: 'i' } },
       ],
-
       [status && 'status']: status,
     };
 
@@ -151,7 +150,7 @@ export class UsersService {
    * @param id
    * @param file
    */
-  async updateAvatar(id: string, file: Express.Multer.File): Promise<User> {
+  async updateAvatar(id: string, file?: Express.Multer.File): Promise<User> {
     if (!file) {
       throw new BadRequestException(MESSAGE_ERROR.FILE_NOT_FOUND);
     }
@@ -161,21 +160,9 @@ export class UsersService {
       throw new NotFoundException(MESSAGE_ERROR.USER_NOT_FOUND);
     }
 
-    const result = await this.cloudinaryService.saveAvatar(
-      file.buffer,
-      `avatars/${user._id}`,
-      `${file.originalname}-${new Date().getTime()}`,
-    );
+    await this.saveAvatar(user, file);
 
-    return await this.userModel.findByIdAndUpdate(
-      id,
-      {
-        avatar: result.url,
-      },
-      {
-        new: true,
-      },
-    );
+    return await this.findOne(id);
   }
 
   /**
@@ -207,7 +194,7 @@ export class UsersService {
     }
 
     const user = await this.userModel
-      .findOne({
+      .exists({
         email,
         ...extras,
       })
@@ -238,17 +225,7 @@ export class UsersService {
     });
 
     if (file) {
-      this.cloudinaryService
-        .saveAvatar(
-          file.buffer,
-          `avatars/${newUser._id}`,
-          `${file.originalname}-${new Date().getTime()}`,
-        )
-        .then(async (result) => {
-          await this.userModel.findByIdAndUpdate(newUser._id, {
-            avatar: result.url,
-          });
-        });
+      this.saveAvatar(newUser, file);
     }
 
     this.mailService.sendWelcome(
@@ -257,5 +234,25 @@ export class UsersService {
     );
 
     return await this.findOne(newUser._id);
+  }
+
+  async saveAvatar(user: User, file: Express.Multer.File): Promise<void> {
+    const JOB_NAME = 'UPLOAD_AVATAR';
+    const uploadInfo: UploadBufferFile = {
+      file: file.buffer,
+      fileName: `${file.originalname}-${new Date().getTime()}`,
+      folder: `avatars/${user._id}`,
+      resourceType: 'image',
+    };
+    this.cloudinaryService
+      .uploadBuffer(JOB_NAME, uploadInfo)
+      .then(async (result) => {
+        await this.userModel.findByIdAndUpdate(user._id, {
+          avatar: result.url,
+        });
+      })
+      .catch((err) => {
+        // Send err
+      });
   }
 }

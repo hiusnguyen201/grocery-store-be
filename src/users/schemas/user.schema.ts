@@ -16,17 +16,17 @@ export class User {
   @Prop({ type: String, required: true, maxLength: 50 })
   name: string;
 
-  @Prop({ type: String, required: true, maxLength: 200 })
+  @Prop({ type: String, required: true, maxLength: 200, unique: true })
   email: string;
 
-  @Prop({ type: String, required: true, maxLength: 100 })
+  @Prop({ type: String, maxLength: 100 })
   password: string;
 
   @Prop({ type: String, maxLength: 50 })
-  googleId: string;
+  googleId?: string;
 
   @Prop({ type: String, maxLength: 50 })
-  facebookId: string;
+  facebookId?: string;
 
   @Prop({
     type: String,

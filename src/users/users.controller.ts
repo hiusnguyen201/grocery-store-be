@@ -13,12 +13,11 @@ import {
   Req,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { FindAllUserDto } from './dto/find-all-user.dto';
-import { imageFileFilter, MAX_UPLOAD_FILE_SIZE } from 'src/utils/upload.util';
+import { configUploadImage } from 'src/utils/upload.util';
 import { MESSAGE_SUCCESS } from 'src/constants/messages';
 import { UrlInterceptor } from 'src/interceptors/url.interceptor';
 
@@ -79,14 +78,7 @@ export class UsersController {
   }
 
   @Patch(':id/avatar')
-  @UseInterceptors(
-    FileInterceptor('avatar', {
-      limits: {
-        fileSize: MAX_UPLOAD_FILE_SIZE,
-      },
-      fileFilter: imageFileFilter,
-    }),
-  )
+  @UseInterceptors(configUploadImage('avatar'))
   async updateAvatar(
     @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File,

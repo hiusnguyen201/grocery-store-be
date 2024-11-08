@@ -10,7 +10,6 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { MailModule } from './mail/mail.module';
 import config from './config/configuration';
-import { CloudinaryService } from './cloudinary/cloudinary.service';
 import { databaseConfig } from './config/database';
 import { queueConfig } from './config/queue';
 import { throttlerConfig } from './config/throttler';

@@ -12,7 +12,7 @@ type UploadFile = {
 };
 
 export type UploadBufferFile = UploadFile & { file: Buffer };
-export type UploadPathFile = UploadFile & { file: string };
+export type UploadPathFile = UploadFile & { filePath: string };
 
 @Injectable()
 export class CloudinaryService {
@@ -27,7 +27,7 @@ export class CloudinaryService {
     });
   }
 
-  private async uploadBuffer(
+  async uploadBuffer(
     jobName: string,
     upload: UploadBufferFile,
   ): Promise<UploadApiResponse> {
@@ -58,14 +58,14 @@ export class CloudinaryService {
     });
   }
 
-  private async uploadFile(
+  async uploadFile(
     jobName: string,
     upload: UploadPathFile,
   ): Promise<UploadApiResponse> {
     const job = await this.uploadQueue.add(jobName, upload);
     return new Promise((resolve, reject) => {
       cloudinary.uploader
-        .upload(upload.file, {
+        .upload(upload.filePath, {
           folder: upload.folder,
           public_id: upload.fileName,
           resource_type: upload.resourceType,
@@ -76,27 +76,5 @@ export class CloudinaryService {
         })
         .catch((err) => reject(err));
     });
-  }
-
-  async saveAvatar(fileBuffer: Buffer, folder: string, fileName: string) {
-    const JOB_NAME = 'UPLOAD_AVATAR';
-    const upload: UploadBufferFile = {
-      file: fileBuffer,
-      folder,
-      fileName,
-      resourceType: 'image',
-    };
-    return await this.uploadBuffer(JOB_NAME, upload);
-  }
-
-  async saveBackupDB(filePath: string, folder: string, fileName: string) {
-    const JOB_NAME = 'UPLOAD_BACKUP_DB';
-    const upload: UploadPathFile = {
-      file: filePath,
-      folder,
-      fileName,
-      resourceType: 'raw',
-    };
-    return await this.uploadFile(JOB_NAME, upload);
   }
 }
