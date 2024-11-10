@@ -17,7 +17,7 @@ export class FindAllUserDto {
 
   @IsOptional()
   @IsString()
-  keyword?: string;
+  query?: string;
 
   @IsOptional()
   @IsString()

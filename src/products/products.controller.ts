@@ -31,18 +31,18 @@ export class ProductsController {
     @Body() createProductDto: CreateProductDto,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    const product = await this.productsService.create(createProductDto, file);
+    const data = await this.productsService.create(createProductDto, file);
     return {
       statusCode: HttpStatus.CREATED,
       message: MESSAGE_SUCCESS.CREATE_PRODUCT_SUCCESS,
-      data: product,
+      data,
     };
   }
 
   @Get()
   @UseInterceptors(UrlInterceptor)
   async findAll(@Req() req: Request, @Query() query: FindAllProductDto) {
-    const data = await this.productsService.findAll(req, query);
+    const data = await this.productsService.findAllWithLatestPrice(req, query);
 
     return {
       statusCode: HttpStatus.OK,
@@ -53,7 +53,7 @@ export class ProductsController {
 
   @Get(':id')
   async findOne(@Param('id') id: string) {
-    const product = await this.productsService.findOne(id);
+    const product = await this.productsService.findOneWithLatestPrice(id);
     return {
       statusCode: HttpStatus.OK,
       message: MESSAGE_SUCCESS.GET_PRODUCT_SUCCESS,
@@ -86,6 +86,36 @@ export class ProductsController {
     return {
       statusCode: HttpStatus.OK,
       message: MESSAGE_SUCCESS.REMOVE_PRODUCT_SUCCESS,
+      data: product,
+    };
+  }
+
+  @Patch(':id/hide')
+  async hide(@Param('id') id: string) {
+    const product = await this.productsService.hide(id);
+    return {
+      statusCode: HttpStatus.OK,
+      message: MESSAGE_SUCCESS.HIDE_PRODUCT_SUCCESS,
+      data: product,
+    };
+  }
+
+  @Patch(':id/show')
+  async show(@Param('id') id: string) {
+    const product = await this.productsService.show(id);
+    return {
+      statusCode: HttpStatus.OK,
+      message: MESSAGE_SUCCESS.SHOW_PRODUCT_SUCCESS,
+      data: product,
+    };
+  }
+
+  @Get(':id/prices')
+  async getAllPrices(@Param('id') id: string) {
+    const product = await this.productsService.getAllPrices(id);
+    return {
+      statusCode: HttpStatus.OK,
+      message: MESSAGE_SUCCESS.GET_PRODUCT_SUCCESS,
       data: product,
     };
   }

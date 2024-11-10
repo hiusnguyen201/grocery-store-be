@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument } from 'mongoose';
+import mongoose, { HydratedDocument } from 'mongoose';
+import { PriceHistory } from 'src/price-histories/schemas/price-history.schema';
 
 export type ProductDocument = HydratedDocument<Product>;
 
@@ -14,8 +15,8 @@ export class Product {
   @Prop({ type: String, maxLength: 400 })
   image: string;
 
-  @Prop({ type: String, required: true, min: 500 }) // 500 vnd
-  price: number;
+  @Prop({ type: [{ type: mongoose.Schema.ObjectId, ref: 'PriceHistory' }] })
+  priceHistories: PriceHistory[];
 
   @Prop({ type: Date, default: null })
   hiddenAt?: Date;

@@ -24,7 +24,7 @@ export class FindAllProductDto {
 
   @IsOptional()
   @IsString()
-  keyword?: string;
+  query?: string;
 
   @IsOptional()
   @Transform(({ value }) => Boolean(value))

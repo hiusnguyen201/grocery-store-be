@@ -10,6 +10,9 @@ export const MESSAGE_ERROR = {
   // Product
   PRODUCT_NAME_EXIST: 'Product Name is exist',
   PRODUCT_NOT_FOUND: 'Product not found',
+
+  // Price history
+  PRICE_HISTORY_NOT_FOUND: 'Price history not found',
 };
 
 export const MESSAGE_SUCCESS = {
@@ -30,4 +33,6 @@ export const MESSAGE_SUCCESS = {
   GET_PRODUCT_SUCCESS: 'Get product successfully',
   UPDATE_PRODUCT_SUCCESS: 'Update product successfully',
   REMOVE_PRODUCT_SUCCESS: 'Remove product successfully',
+  HIDE_PRODUCT_SUCCESS: 'Hide product successfully',
+  SHOW_PRODUCT_SUCCESS: 'Show product successfully',
 };

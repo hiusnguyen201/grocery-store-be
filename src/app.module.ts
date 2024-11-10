@@ -15,6 +15,7 @@ import { queueConfig } from './config/queue';
 import { throttlerConfig } from './config/throttler';
 import { scheduleConfig } from './config/schedule';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
+import { PriceHistoriesModule } from './price-histories/price-histories.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { CloudinaryModule } from './cloudinary/cloudinary.module';
     AuthModule,
     MailModule,
     CloudinaryModule,
+    PriceHistoriesModule,
   ],
   controllers: [AppController],
   providers: [

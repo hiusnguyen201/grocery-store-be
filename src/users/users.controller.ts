@@ -26,8 +26,12 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
-  async create(@Body() createUserDto: CreateUserDto) {
-    const user = await this.usersService.create(createUserDto);
+  @UseInterceptors(configUploadImage('avatar'))
+  async create(
+    @Body() createUserDto: CreateUserDto,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    const user = await this.usersService.create(createUserDto, file);
     return {
       statusCode: HttpStatus.CREATED,
       message: MESSAGE_SUCCESS.CREATE_USER_SUCCESS,
@@ -58,8 +62,13 @@ export class UsersController {
   }
 
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    const user = await this.usersService.updateInfo(id, updateUserDto);
+  @UseInterceptors(configUploadImage('avatar'))
+  async update(
+    @Param('id') id: string,
+    @Body() updateUserDto: UpdateUserDto,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    const user = await this.usersService.update(id, updateUserDto, file);
     return {
       statusCode: HttpStatus.OK,
       message: MESSAGE_SUCCESS.UPDATE_USER_SUCCESS,
@@ -73,20 +82,6 @@ export class UsersController {
     return {
       statusCode: HttpStatus.OK,
       message: MESSAGE_SUCCESS.REMOVE_USER_SUCCESS,
-      data: user,
-    };
-  }
-
-  @Patch(':id/avatar')
-  @UseInterceptors(configUploadImage('avatar'))
-  async updateAvatar(
-    @Param('id') id: string,
-    @UploadedFile() file: Express.Multer.File,
-  ) {
-    const user = await this.usersService.updateAvatar(id, file);
-    return {
-      statusCode: HttpStatus.OK,
-      message: MESSAGE_SUCCESS.UPDATE_USER_SUCCESS,
       data: user,
     };
   }

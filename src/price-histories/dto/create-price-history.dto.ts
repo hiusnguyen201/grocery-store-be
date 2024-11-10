@@ -1,11 +1,11 @@
 import { Transform } from 'class-transformer';
-import { IsInt, IsNotEmpty, IsString, MaxLength, Min } from 'class-validator';
+import { IsDate, IsInt, IsNotEmpty, IsString, Min } from 'class-validator';
+import { Product } from 'src/products/schemas/product.schema';
 
-export class CreateProductDto {
+export class CreatePriceHistoryDto {
   @IsNotEmpty()
   @IsString()
-  @MaxLength(200)
-  name: string;
+  product: string;
 
   @IsNotEmpty()
   @Transform(({ value }) => Number(value))
@@ -18,4 +18,9 @@ export class CreateProductDto {
   @IsInt()
   @Min(500)
   salePrice: number;
+
+  @IsNotEmpty()
+  @Transform(({ value }) => new Date(value))
+  @IsDate()
+  valuationAt: Date;
 }

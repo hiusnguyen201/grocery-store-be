@@ -1,19 +1,24 @@
 import {
   BadRequestException,
+  forwardRef,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { Request } from 'express';
-import mongoose, {
+import {
   FilterQuery,
   isValidObjectId,
   Model,
   RootFilterQuery,
+  Connection,
+  Types,
+  PopulateOptions,
 } from 'mongoose';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { FindAllProductDto } from './dto/find-all-product.dto';
-import { InjectModel } from '@nestjs/mongoose';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Product } from './schemas/product.schema';
 import {
   CloudinaryService,
@@ -22,12 +27,17 @@ import {
 import { MESSAGE_ERROR } from 'src/constants/messages';
 import { PER_PAGE } from 'src/constants/common';
 import { PageMetaDto } from 'src/dtos/page-meta.dto';
+import { PriceHistoriesService } from 'src/price-histories/price-histories.service';
+import { CreatePriceHistoryDto } from 'src/price-histories/dto/create-price-history.dto';
 
 @Injectable()
 export class ProductsService {
   constructor(
     @InjectModel(Product.name) private productModel: Model<Product>,
-    private cloudinaryService: CloudinaryService,
+    @Inject(forwardRef(() => PriceHistoriesService))
+    private readonly priceHistoriesService: PriceHistoriesService,
+    private readonly cloudinaryService: CloudinaryService,
+    @InjectConnection() private readonly connection: Connection,
   ) {}
 
   /**
@@ -44,37 +54,64 @@ export class ProductsService {
       throw new BadRequestException(MESSAGE_ERROR.PRODUCT_NAME_EXIST);
     }
 
-    const product = await this.productModel.create({
-      _id: new mongoose.Types.ObjectId(),
-      createProductDto,
-    });
+    const session = await this.connection.startSession();
+    const { name, marketPrice, salePrice } = createProductDto;
+    try {
+      session.startTransaction();
 
-    if (file) {
-      this.saveImage(product, file);
+      // New a Product Obj
+      const product = await this.productModel.create({
+        _id: new Types.ObjectId(),
+        name,
+      });
+
+      // Add price to price history
+      product.priceHistories.push(
+        await this.priceHistoriesService.create({
+          marketPrice,
+          salePrice,
+          product: product._id,
+          valuationAt: new Date(),
+        } as CreatePriceHistoryDto),
+      );
+
+      // Save product
+      await product.save();
+
+      // Save image if have
+      if (file) {
+        this.saveImage(product, file);
+      }
+
+      await session.commitTransaction();
+      return product;
+    } catch (err) {
+      await session.abortTransaction();
+      throw err;
+    } finally {
+      await session.endSession();
     }
-
-    return product;
   }
 
   /**
-   * Find all products
+   * Find all products with latest price
    * @param req
    * @param query
    * @returns
    */
-  async findAll(
+  async findAllWithLatestPrice(
     req: Request,
-    query: FindAllProductDto,
+    findAllProductDto: FindAllProductDto,
   ): Promise<{ meta: PageMetaDto; products: Product[] }> {
     const {
       page = 1,
       limit = PER_PAGE[0],
-      keyword = '',
+      query = '',
       isHidden = false,
-    } = query;
+    } = findAllProductDto;
 
     const filterQuery: RootFilterQuery<Product> = {
-      name: keyword,
+      name: { $regex: query, $options: 'i' },
       hiddenAt: isHidden ? { $ne: null } : { $eq: null },
     };
 
@@ -85,7 +122,16 @@ export class ProductsService {
     const products = await this.productModel
       .find(filterQuery)
       .skip(pageMetaDto.offset)
-      .limit(limit);
+      .limit(limit)
+      .populate({
+        path: 'priceHistories',
+        options: {
+          sort: {
+            createdAt: -1,
+          },
+          limit: 1,
+        },
+      } as PopulateOptions);
 
     return { meta: pageMetaDto, products };
   }
@@ -109,6 +155,38 @@ export class ProductsService {
   }
 
   /**
+   *Find product with latest price
+   * @param id
+   * @param selectFields
+   * @returns
+   */
+  async findOneWithLatestPrice(
+    id: string,
+    selectFields?: string,
+  ): Promise<Product> {
+    const filter: Partial<Product> = {};
+
+    if (isValidObjectId(id)) {
+      filter._id = id;
+    } else {
+      filter.name = id;
+    }
+
+    return await this.productModel
+      .findOne(filter)
+      .select(selectFields)
+      .populate({
+        path: 'priceHistories',
+        options: {
+          sort: {
+            createdAt: -1,
+          },
+          limit: 1,
+        },
+      } as PopulateOptions);
+  }
+
+  /**
    * Update product
    * @param id
    * @param updateProductDto
@@ -124,18 +202,89 @@ export class ProductsService {
       throw new BadRequestException(MESSAGE_ERROR.PRODUCT_NAME_EXIST);
     }
 
+    if (!(await this.findOne(id))) {
+      throw new NotFoundException(MESSAGE_ERROR.PRODUCT_NOT_FOUND);
+    }
+
+    const session = await this.connection.startSession();
+    const { name, marketPrice, salePrice } = updateProductDto;
+    try {
+      session.startTransaction();
+
+      // Update product
+      const updatedProduct = await this.productModel.findByIdAndUpdate(
+        id,
+        {
+          name,
+        },
+        { new: true },
+      );
+
+      // Check 1 of variable provided, add to price histories
+      if (marketPrice && salePrice) {
+        updatedProduct.priceHistories.push(
+          await this.priceHistoriesService.create({
+            marketPrice,
+            salePrice,
+            product: id,
+            valuationAt: new Date(),
+          } as CreatePriceHistoryDto),
+        );
+      }
+
+      await updatedProduct.save();
+
+      // Save image if have
+      if (file) {
+        this.saveImage(updatedProduct, file);
+      }
+
+      await session.commitTransaction();
+      return updatedProduct;
+    } catch (err) {
+      await session.abortTransaction();
+      throw err;
+    } finally {
+      await session.endSession();
+    }
+  }
+
+  /**
+   * Hide product
+   * @param id
+   * @returns
+   */
+  async hide(id: string): Promise<Product> {
     const product = await this.findOne(id);
     if (!product) {
       throw new NotFoundException(MESSAGE_ERROR.PRODUCT_NOT_FOUND);
     }
 
-    if (file) {
-      this.saveImage(product, file);
+    return await this.productModel.findByIdAndUpdate(
+      id,
+      {
+        hiddenAt: new Date(),
+      },
+      { new: true },
+    );
+  }
+
+  /**
+   * Show product
+   * @param id
+   * @returns
+   */
+  async show(id: string): Promise<Product> {
+    const product = await this.findOne(id);
+    if (!product) {
+      throw new NotFoundException(MESSAGE_ERROR.PRODUCT_NOT_FOUND);
     }
 
     return await this.productModel.findByIdAndUpdate(
-      product._id,
-      updateProductDto,
+      id,
+      {
+        hiddenAt: null,
+      },
       { new: true },
     );
   }
@@ -164,6 +313,21 @@ export class ProductsService {
   }
 
   /**
+   * Get all prices
+   * @param id
+   * @returns
+   */
+  async getAllPrices(id: string): Promise<Product> {
+    if (!(await this.findOne(id))) {
+      throw new NotFoundException(MESSAGE_ERROR.PRODUCT_NOT_FOUND);
+    }
+
+    return await this.productModel.findById(id).populate({
+      path: 'priceHistories',
+    } as PopulateOptions);
+  }
+
+  /**
    * Check exist product name
    * @param name
    * @param skipId
@@ -185,6 +349,11 @@ export class ProductsService {
     return !!product;
   }
 
+  /**
+   * Save product image
+   * @param product
+   * @param file
+   */
   private async saveImage(
     product: Product,
     file: Express.Multer.File,

@@ -40,7 +40,10 @@ export class UsersService {
    * @param file
    * @returns
    */
-  async create(createUserDto: CreateUserDto): Promise<User> {
+  async create(
+    createUserDto: CreateUserDto,
+    file?: Express.Multer.File,
+  ): Promise<User> {
     if (await this.isExistEmail(createUserDto.email)) {
       throw new BadRequestException(MESSAGE_ERROR.EMAIL_EXIST);
     }
@@ -54,6 +57,10 @@ export class UsersService {
     });
 
     this.mailService.sendPassword(newUser.email, passwordGenerate);
+
+    if (file) {
+      this.saveAvatar(newUser, file);
+    }
 
     // Return user without password
     return await this.findOne(newUser._id);
@@ -70,24 +77,25 @@ export class UsersService {
 
   /**
    * Find all user
-   * @param queryString
+   * @param req
+   * @param query
    * @returns
    */
   async findAll(
     req: Request,
-    query: FindAllUserDto,
+    findAllUserDto: FindAllUserDto,
   ): Promise<{ meta: PageMetaDto; users: User[] }> {
     const {
       page = 1,
       limit = PER_PAGE[0],
-      keyword = '',
+      query = '',
       status = null,
-    } = query;
+    } = findAllUserDto;
 
     const filterQuery: RootFilterQuery<User> = {
       $or: [
-        { name: { $regex: keyword, $options: 'i' } }, // Option "i" - Search lowercase and uppercase
-        { email: { $regex: keyword, $options: 'i' } },
+        { name: { $regex: query, $options: 'i' } }, // Option "i" - Search lowercase and uppercase
+        { email: { $regex: query, $options: 'i' } },
       ],
       [status && 'status']: status,
     };
@@ -125,12 +133,16 @@ export class UsersService {
   }
 
   /**
-   * Update info user
+   * Update user
    * @param id
    * @param updateUserDto
    * @returns
    */
-  async updateInfo(id: string, updateUserDto: UpdateUserDto): Promise<User> {
+  async update(
+    id: string,
+    updateUserDto: UpdateUserDto,
+    file?: Express.Multer.File,
+  ): Promise<User> {
     if (await this.isExistEmail(updateUserDto.email, id)) {
       throw new BadRequestException(MESSAGE_ERROR.EMAIL_EXIST);
     }
@@ -140,29 +152,13 @@ export class UsersService {
       throw new NotFoundException(MESSAGE_ERROR.USER_NOT_FOUND);
     }
 
+    if (file) {
+      this.saveAvatar(user, file);
+    }
+
     return await this.userModel.findByIdAndUpdate(id, updateUserDto, {
       new: true,
     });
-  }
-
-  /**
-   * Update avatar user
-   * @param id
-   * @param file
-   */
-  async updateAvatar(id: string, file?: Express.Multer.File): Promise<User> {
-    if (!file) {
-      throw new BadRequestException(MESSAGE_ERROR.FILE_NOT_FOUND);
-    }
-
-    const user = await this.findOne(id);
-    if (!user) {
-      throw new NotFoundException(MESSAGE_ERROR.USER_NOT_FOUND);
-    }
-
-    await this.saveAvatar(user, file);
-
-    return await this.findOne(id);
   }
 
   /**
