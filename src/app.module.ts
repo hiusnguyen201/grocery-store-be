@@ -16,6 +16,7 @@ import { throttlerConfig } from './config/throttler';
 import { scheduleConfig } from './config/schedule';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { PriceHistoriesModule } from './price-histories/price-histories.module';
+import { DatabaseModule } from './database/database.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { PriceHistoriesModule } from './price-histories/price-histories.module';
     MailModule,
     CloudinaryModule,
     PriceHistoriesModule,
+    DatabaseModule,
   ],
   controllers: [AppController],
   providers: [
