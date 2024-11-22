@@ -10,6 +10,7 @@ export const MESSAGE_ERROR = {
   // Product
   PRODUCT_NAME_EXIST: 'Product Name is exist',
   PRODUCT_NOT_FOUND: 'Product not found',
+  PRODUCT_CONTAINS_PRICE_HISTORY: 'Product contains price history',
 
   // Price history
   PRICE_HISTORY_NOT_FOUND: 'Price history not found',

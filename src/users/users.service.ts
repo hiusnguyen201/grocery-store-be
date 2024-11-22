@@ -84,7 +84,7 @@ export class UsersService {
   async findAll(
     req: Request,
     findAllUserDto: FindAllUserDto,
-  ): Promise<{ meta: PageMetaDto; users: User[] }> {
+  ): Promise<{ meta: PageMetaDto; list: User[] }> {
     const {
       page = 1,
       limit = PER_PAGE[0],
@@ -110,7 +110,7 @@ export class UsersService {
       .limit(limit)
       .select('-password');
 
-    return { meta: pageMetaDto, users };
+    return { meta: pageMetaDto, list: users };
   }
 
   /**

@@ -29,6 +29,8 @@ import { PER_PAGE } from 'src/constants/common';
 import { PageMetaDto } from 'src/dtos/page-meta.dto';
 import { PriceHistoriesService } from 'src/price-histories/price-histories.service';
 import { CreatePriceHistoryDto } from 'src/price-histories/dto/create-price-history.dto';
+import { makeSlug } from 'src/utils/string.utils';
+import { PriceHistory } from 'src/price-histories/schemas/price-history.schema';
 
 @Injectable()
 export class ProductsService {
@@ -49,13 +51,13 @@ export class ProductsService {
   async create(
     createProductDto: CreateProductDto,
     file?: Express.Multer.File,
-  ): Promise<Product> {
+  ): Promise<Product & Partial<PriceHistory>> {
     if (await this.isExistName(createProductDto.name)) {
       throw new BadRequestException(MESSAGE_ERROR.PRODUCT_NAME_EXIST);
     }
 
     const session = await this.connection.startSession();
-    const { name, marketPrice, salePrice } = createProductDto;
+    const { name, marketPrice, salePrice, status } = createProductDto;
     try {
       session.startTransaction();
 
@@ -63,6 +65,8 @@ export class ProductsService {
       const product = await this.productModel.create({
         _id: new Types.ObjectId(),
         name,
+        slug: makeSlug(name),
+        status,
       });
 
       // Add price to price history
@@ -84,7 +88,11 @@ export class ProductsService {
       }
 
       await session.commitTransaction();
-      return product;
+
+      const productObj = product.toObject();
+      delete productObj.priceHistories;
+
+      return { ...productObj, marketPrice, salePrice };
     } catch (err) {
       await session.abortTransaction();
       throw err;
@@ -102,7 +110,7 @@ export class ProductsService {
   async findAllWithLatestPrice(
     req: Request,
     findAllProductDto: FindAllProductDto,
-  ): Promise<{ meta: PageMetaDto; products: Product[] }> {
+  ): Promise<{ meta: PageMetaDto; list: Product[] }> {
     const {
       page = 1,
       limit = PER_PAGE[0],
@@ -131,9 +139,22 @@ export class ProductsService {
           },
           limit: 1,
         },
+        select: 'salePrice marketPrice',
       } as PopulateOptions);
 
-    return { meta: pageMetaDto, products };
+    const formatters = products.map((item) => {
+      let obj = item.toObject();
+      const formatter = {
+        ...obj,
+        marketPrice: item.priceHistories[0].marketPrice,
+        salePrice: item.priceHistories[0].salePrice,
+      };
+
+      delete formatter.priceHistories;
+      return formatter;
+    });
+
+    return { meta: pageMetaDto, list: formatters };
   }
 
   /**
@@ -298,6 +319,12 @@ export class ProductsService {
     const product = await this.findOne(id);
     if (!product) {
       throw new NotFoundException(MESSAGE_ERROR.PRODUCT_NOT_FOUND);
+    }
+
+    if (product.priceHistories && product.priceHistories.length > 0) {
+      throw new BadRequestException(
+        MESSAGE_ERROR.PRODUCT_CONTAINS_PRICE_HISTORY,
+      );
     }
 
     return await this.productModel.findByIdAndDelete(id);
