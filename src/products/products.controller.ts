@@ -25,6 +25,16 @@ import { configUploadImage } from 'src/utils/upload.util';
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
+  @Post('is-exist')
+  async checkExist(@Body('id') id: string) {
+    const data = await this.productsService.checkExist(id);
+    return {
+      statusCode: HttpStatus.OK,
+      message: MESSAGE_SUCCESS.PRODUCT_EXIST,
+      data,
+    };
+  }
+
   @Post()
   @UseInterceptors(configUploadImage('image'))
   async create(
@@ -53,11 +63,11 @@ export class ProductsController {
 
   @Get(':id')
   async findOne(@Param('id') id: string) {
-    const product = await this.productsService.findOneWithLatestPrice(id);
+    const data = await this.productsService.findOneWithLatestPrice(id);
     return {
       statusCode: HttpStatus.OK,
       message: MESSAGE_SUCCESS.GET_PRODUCT_SUCCESS,
-      data: product,
+      data,
     };
   }
 
@@ -68,55 +78,51 @@ export class ProductsController {
     @Body() updateProductDto: UpdateProductDto,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    const product = await this.productsService.update(
-      id,
-      updateProductDto,
-      file,
-    );
+    const data = await this.productsService.update(id, updateProductDto, file);
     return {
       statusCode: HttpStatus.OK,
       message: MESSAGE_SUCCESS.UPDATE_USER_SUCCESS,
-      data: product,
+      data,
     };
   }
 
   @Delete(':id')
   async remove(@Param('id') id: string) {
-    const product = await this.productsService.remove(id);
+    const data = await this.productsService.remove(id);
     return {
       statusCode: HttpStatus.OK,
       message: MESSAGE_SUCCESS.REMOVE_PRODUCT_SUCCESS,
-      data: product,
+      data,
     };
   }
 
   @Patch(':id/hide')
   async hide(@Param('id') id: string) {
-    const product = await this.productsService.hide(id);
+    const data = await this.productsService.hide(id);
     return {
       statusCode: HttpStatus.OK,
       message: MESSAGE_SUCCESS.HIDE_PRODUCT_SUCCESS,
-      data: product,
+      data,
     };
   }
 
   @Patch(':id/show')
   async show(@Param('id') id: string) {
-    const product = await this.productsService.show(id);
+    const data = await this.productsService.show(id);
     return {
       statusCode: HttpStatus.OK,
       message: MESSAGE_SUCCESS.SHOW_PRODUCT_SUCCESS,
-      data: product,
+      data,
     };
   }
 
   @Get(':id/prices')
   async getAllPrices(@Param('id') id: string) {
-    const product = await this.productsService.getAllPrices(id);
+    const data = await this.productsService.getAllPrices(id);
     return {
       statusCode: HttpStatus.OK,
       message: MESSAGE_SUCCESS.GET_PRODUCT_SUCCESS,
-      data: product,
+      data,
     };
   }
 }

@@ -36,4 +36,5 @@ export const MESSAGE_SUCCESS = {
   REMOVE_PRODUCT_SUCCESS: 'Remove product successfully',
   HIDE_PRODUCT_SUCCESS: 'Hide product successfully',
   SHOW_PRODUCT_SUCCESS: 'Show product successfully',
+  PRODUCT_EXIST: 'Product exist',
 };

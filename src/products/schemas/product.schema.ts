@@ -10,11 +10,29 @@ export class Product {
   @Prop()
   _id: string;
 
-  @Prop({ type: String, required: true, maxLength: 255, unique: true })
+  @Prop({
+    type: String,
+    required: true,
+    maxLength: 255,
+    unique: true,
+    index: true,
+  })
   slug: string;
 
-  @Prop({ type: String, required: true, maxLength: 200, unique: true })
+  @Prop({
+    type: String,
+    required: true,
+    maxLength: 200,
+    unique: true,
+    index: true,
+  })
   name: string;
+
+  @Prop({
+    type: String,
+    maxLength: 200,
+  })
+  normalizeName: string;
 
   @Prop({ type: String, required: true, default: EProductStatus.ACTIVE })
   status: EProductStatus;

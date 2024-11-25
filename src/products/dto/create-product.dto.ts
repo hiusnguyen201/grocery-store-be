@@ -8,15 +8,13 @@ import {
   Min,
 } from 'class-validator';
 import { EProductStatus } from 'src/constants/common';
-import REGEX_PATTERNS from 'src/constants/regex-patterns';
+import { replaceAllSpacesToSpace } from 'src/utils/string.utils';
 
 export class CreateProductDto {
   @IsNotEmpty()
   @IsString()
   @MaxLength(200)
-  @Transform(({ value }: { value: string }) =>
-    value.trim().replace(REGEX_PATTERNS.WHITE_SPACE, ' '),
-  )
+  @Transform(({ value }) => replaceAllSpacesToSpace(value))
   name: string;
 
   @IsNotEmpty()

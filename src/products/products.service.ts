@@ -25,12 +25,11 @@ import {
   UploadBufferFile,
 } from 'src/cloudinary/cloudinary.service';
 import { MESSAGE_ERROR } from 'src/constants/messages';
-import { PER_PAGE } from 'src/constants/common';
+import { EProductStatus, PER_PAGE } from 'src/constants/common';
 import { PageMetaDto } from 'src/dtos/page-meta.dto';
 import { PriceHistoriesService } from 'src/price-histories/price-histories.service';
 import { CreatePriceHistoryDto } from 'src/price-histories/dto/create-price-history.dto';
-import { makeSlug } from 'src/utils/string.utils';
-import { PriceHistory } from 'src/price-histories/schemas/price-history.schema';
+import { makeSlug, removeAccents } from 'src/utils/string.utils';
 
 @Injectable()
 export class ProductsService {
@@ -51,7 +50,7 @@ export class ProductsService {
   async create(
     createProductDto: CreateProductDto,
     file?: Express.Multer.File,
-  ): Promise<Product & Partial<PriceHistory>> {
+  ): Promise<Product> {
     if (await this.isExistName(createProductDto.name)) {
       throw new BadRequestException(MESSAGE_ERROR.PRODUCT_NAME_EXIST);
     }
@@ -65,8 +64,10 @@ export class ProductsService {
       const product = await this.productModel.create({
         _id: new Types.ObjectId(),
         name,
+        normalizeName: removeAccents(name),
         slug: makeSlug(name),
         status,
+        hiddenAt: status === EProductStatus.INACTIVE ? new Date() : null,
       });
 
       // Add price to price history
@@ -89,10 +90,7 @@ export class ProductsService {
 
       await session.commitTransaction();
 
-      const productObj = product.toObject();
-      delete productObj.priceHistories;
-
-      return { ...productObj, marketPrice, salePrice };
+      return product;
     } catch (err) {
       await session.abortTransaction();
       throw err;
@@ -114,13 +112,21 @@ export class ProductsService {
     const {
       page = 1,
       limit = PER_PAGE[0],
-      query = '',
-      isHidden = false,
+      isHidden,
+      name = '',
+      status,
     } = findAllProductDto;
 
+    // Solution elastic search OR add more field normalizeName (Search without accents)
     const filterQuery: RootFilterQuery<Product> = {
-      name: { $regex: query, $options: 'i' },
-      hiddenAt: isHidden ? { $ne: null } : { $eq: null },
+      $or: [
+        { name: { $regex: name, $options: 'i' } },
+        { normalizeName: { $regex: name, $options: 'i' } },
+      ],
+      ...(status ? { status } : {}),
+      ...(isHidden !== undefined
+        ? { hiddenAt: isHidden ? { $ne: null } : { $eq: null } }
+        : {}),
     };
 
     const totalCount = await this.countAll(filterQuery);
@@ -129,8 +135,9 @@ export class ProductsService {
 
     const products = await this.productModel
       .find(filterQuery)
+      .collation({ locale: 'vi', strength: 1 })
       .skip(pageMetaDto.offset)
-      .limit(limit)
+      .limit(pageMetaDto.limit)
       .populate({
         path: 'priceHistories',
         options: {
@@ -139,22 +146,9 @@ export class ProductsService {
           },
           limit: 1,
         },
-        select: 'salePrice marketPrice',
       } as PopulateOptions);
 
-    const formatters = products.map((item) => {
-      let obj = item.toObject();
-      const formatter = {
-        ...obj,
-        marketPrice: item.priceHistories[0].marketPrice,
-        salePrice: item.priceHistories[0].salePrice,
-      };
-
-      delete formatter.priceHistories;
-      return formatter;
-    });
-
-    return { meta: pageMetaDto, list: formatters };
+    return { meta: pageMetaDto, list: products };
   }
 
   /**
@@ -193,7 +187,7 @@ export class ProductsService {
       filter.name = id;
     }
 
-    return await this.productModel
+    const product = await this.productModel
       .findOne(filter)
       .select(selectFields)
       .populate({
@@ -205,6 +199,21 @@ export class ProductsService {
           limit: 1,
         },
       } as PopulateOptions);
+
+    if (!product) {
+      throw new NotFoundException(MESSAGE_ERROR.PRODUCT_NOT_FOUND);
+    }
+
+    return product;
+  }
+
+  /**
+   * Check exist product
+   * @param id
+   * @returns
+   */
+  async checkExist(id: string): Promise<boolean> {
+    return !!(await this.findOne(id, '_id'));
   }
 
   /**
@@ -223,7 +232,7 @@ export class ProductsService {
       throw new BadRequestException(MESSAGE_ERROR.PRODUCT_NAME_EXIST);
     }
 
-    if (!(await this.findOne(id))) {
+    if (!(await this.findOne(id, '_id'))) {
       throw new NotFoundException(MESSAGE_ERROR.PRODUCT_NOT_FOUND);
     }
 
@@ -276,7 +285,7 @@ export class ProductsService {
    * @returns
    */
   async hide(id: string): Promise<Product> {
-    const product = await this.findOne(id);
+    const product = await this.findOne(id, '_id');
     if (!product) {
       throw new NotFoundException(MESSAGE_ERROR.PRODUCT_NOT_FOUND);
     }
@@ -296,7 +305,7 @@ export class ProductsService {
    * @returns
    */
   async show(id: string): Promise<Product> {
-    const product = await this.findOne(id);
+    const product = await this.findOne(id, '_id');
     if (!product) {
       throw new NotFoundException(MESSAGE_ERROR.PRODUCT_NOT_FOUND);
     }
@@ -368,10 +377,12 @@ export class ProductsService {
       };
     }
 
-    const product = await this.productModel.exists({
-      name,
-      ...extras,
-    });
+    const product = await this.productModel
+      .exists({
+        name,
+        ...extras,
+      })
+      .select('name');
 
     return !!product;
   }
