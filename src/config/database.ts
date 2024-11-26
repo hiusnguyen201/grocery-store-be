@@ -3,7 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Connection, set } from 'mongoose';
 import { softDeletePlugin } from 'src/database/plugins/softDelete.plugin';
 
-set('debug', true);
+// set('debug', true);
 
 export const databaseConfig = MongooseModule.forRootAsync({
   useFactory: (configService: ConfigService) => ({

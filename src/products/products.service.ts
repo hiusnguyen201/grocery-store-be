@@ -22,6 +22,7 @@ import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Product } from './schemas/product.schema';
 import {
   CloudinaryService,
+  CROP_IMAGE_OPTIONS,
   UploadBufferFile,
 } from 'src/cloudinary/cloudinary.service';
 import { MESSAGE_ERROR } from 'src/constants/messages';
@@ -29,12 +30,22 @@ import { EProductStatus, PER_PAGE } from 'src/constants/common';
 import { PageMetaDto } from 'src/dtos/page-meta.dto';
 import { PriceHistoriesService } from 'src/price-histories/price-histories.service';
 import { CreatePriceHistoryDto } from 'src/price-histories/dto/create-price-history.dto';
-import { makeSlug, removeAccents } from 'src/utils/string.utils';
+import {
+  insertValToArr,
+  makeSlug,
+  randomString,
+  removeAccents,
+} from 'src/utils/string.utils';
+import regexPatterns from 'src/constants/regex-patterns';
+import { v4 as uuidv4 } from 'uuid';
+import { ProductImage } from './schemas/product-image.schema';
 
 @Injectable()
 export class ProductsService {
   constructor(
     @InjectModel(Product.name) private productModel: Model<Product>,
+    @InjectModel(ProductImage.name)
+    private productImageModel: Model<ProductImage>,
     @Inject(forwardRef(() => PriceHistoriesService))
     private readonly priceHistoriesService: PriceHistoriesService,
     private readonly cloudinaryService: CloudinaryService,
@@ -60,12 +71,13 @@ export class ProductsService {
     try {
       session.startTransaction();
 
+      const normalizeName = removeAccents(name);
       // New a Product Obj
       const product = await this.productModel.create({
         _id: new Types.ObjectId(),
         name,
-        normalizeName: removeAccents(name),
-        slug: makeSlug(name),
+        normalizeName,
+        slug: `${makeSlug(normalizeName.toLowerCase())}-${randomString()}`,
         status,
         hiddenAt: status === EProductStatus.INACTIVE ? new Date() : null,
       });
@@ -85,7 +97,7 @@ export class ProductsService {
 
       // Save image if have
       if (file) {
-        this.saveImage(product, file);
+        this.saveImage(product._id, file);
       }
 
       await session.commitTransaction();
@@ -162,6 +174,8 @@ export class ProductsService {
 
     if (isValidObjectId(id)) {
       filter._id = id;
+    } else if (regexPatterns.VALID_SLUG.test(id)) {
+      filter.slug = id;
     } else {
       filter.name = id;
     }
@@ -183,6 +197,8 @@ export class ProductsService {
 
     if (isValidObjectId(id)) {
       filter._id = id;
+    } else if (regexPatterns.VALID_SLUG.test(id)) {
+      filter.slug = id;
     } else {
       filter.name = id;
     }
@@ -205,15 +221,6 @@ export class ProductsService {
     }
 
     return product;
-  }
-
-  /**
-   * Check exist product
-   * @param id
-   * @returns
-   */
-  async checkExist(id: string): Promise<boolean> {
-    return !!(await this.findOne(id, '_id'));
   }
 
   /**
@@ -266,7 +273,7 @@ export class ProductsService {
 
       // Save image if have
       if (file) {
-        this.saveImage(updatedProduct, file);
+        this.saveImage(updatedProduct._id, file);
       }
 
       await session.commitTransaction();
@@ -290,13 +297,12 @@ export class ProductsService {
       throw new NotFoundException(MESSAGE_ERROR.PRODUCT_NOT_FOUND);
     }
 
-    return await this.productModel.findByIdAndUpdate(
-      id,
-      {
-        hiddenAt: new Date(),
-      },
-      { new: true },
-    );
+    await this.productModel.findByIdAndUpdate(id, {
+      hiddenAt: new Date(),
+      status: EProductStatus.INACTIVE,
+    });
+
+    return await this.findOneWithLatestPrice(id);
   }
 
   /**
@@ -310,13 +316,12 @@ export class ProductsService {
       throw new NotFoundException(MESSAGE_ERROR.PRODUCT_NOT_FOUND);
     }
 
-    return await this.productModel.findByIdAndUpdate(
-      id,
-      {
-        hiddenAt: null,
-      },
-      { new: true },
-    );
+    await this.productModel.findByIdAndUpdate(id, {
+      hiddenAt: null,
+      status: EProductStatus.ACTIVE,
+    });
+
+    return await this.findOneWithLatestPrice(id);
   }
 
   /**
@@ -393,22 +398,44 @@ export class ProductsService {
    * @param file
    */
   private async saveImage(
-    product: Product,
+    id: string,
     file: Express.Multer.File,
   ): Promise<void> {
     const JOB_NAME = 'UPLOAD_PRODUCT_IMAGE';
+    const fileName = `${uuidv4()}-${new Date().getTime()}`;
     const uploadInfo: UploadBufferFile = {
       file: file.buffer,
-      folder: `products/${product._id}`,
-      fileName: `${file.originalname}-${new Date().getTime()}`,
+      folder: `products/${id}`,
+      fileName,
       resourceType: 'image',
     };
 
     this.cloudinaryService
       .uploadBuffer(JOB_NAME, uploadInfo)
       .then(async (result) => {
-        await this.productModel.findByIdAndUpdate(product._id, {
+        await this.productModel.findByIdAndUpdate(id, {
           image: result.url,
+        });
+        const segments = result.url.split('/');
+        const indexInsertOptions = segments.indexOf(`v${result.version}`);
+
+        await this.productImageModel.create({
+          _id: new Types.ObjectId(),
+          product: id,
+          bytes: result.bytes,
+          displayName: fileName,
+          format: result.format,
+          originalPath: result.url,
+          mediumPath: insertValToArr(
+            segments,
+            CROP_IMAGE_OPTIONS.MEDIUM,
+            indexInsertOptions,
+          ).join('/'),
+          smallPath: insertValToArr(
+            segments,
+            CROP_IMAGE_OPTIONS.SMALL,
+            indexInsertOptions,
+          ).join('/'),
         });
       })
       .catch((err) => {

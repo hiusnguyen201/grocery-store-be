@@ -24,8 +24,6 @@ export class ResponseFormatterInterceptor implements NestInterceptor {
           };
         }
 
-        console.log(formatter);
-
         return formatter;
       }),
     );

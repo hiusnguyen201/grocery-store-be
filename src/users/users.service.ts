@@ -48,7 +48,7 @@ export class UsersService {
       throw new BadRequestException(MESSAGE_ERROR.EMAIL_EXIST);
     }
 
-    const passwordGenerate = randomString(8);
+    const passwordGenerate = randomString();
     const hashedPassword = await makeHash(passwordGenerate);
     const newUser = await this.userModel.create({
       _id: new mongoose.Types.ObjectId(),

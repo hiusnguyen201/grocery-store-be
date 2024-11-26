@@ -11,6 +11,11 @@ type UploadFile = {
   resourceType: 'image' | 'video' | 'raw' | 'auto';
 };
 
+export const CROP_IMAGE_OPTIONS = {
+  MEDIUM: 'w_500,h_500,c_fit',
+  SMALL: 'w_200,h_200,c_fit',
+};
+
 export type UploadBufferFile = UploadFile & { file: Buffer };
 export type UploadPathFile = UploadFile & { filePath: string };
 

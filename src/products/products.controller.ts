@@ -25,9 +25,9 @@ import { configUploadImage } from 'src/utils/upload.util';
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
-  @Post('is-exist')
-  async checkExist(@Body('id') id: string) {
-    const data = await this.productsService.checkExist(id);
+  @Post('is-exist-name')
+  async checkExist(@Body('id') id: string, @Body('skipId') skipId?: string) {
+    const data = await this.productsService.isExistName(id, skipId);
     return {
       statusCode: HttpStatus.OK,
       message: MESSAGE_SUCCESS.PRODUCT_EXIST,
