@@ -33,7 +33,6 @@ import { CreatePriceHistoryDto } from 'src/price-histories/dto/create-price-hist
 import {
   insertValToArr,
   makeSlug,
-  randomString,
   removeAccents,
 } from 'src/utils/string.utils';
 import regexPatterns from 'src/constants/regex-patterns';
@@ -77,7 +76,7 @@ export class ProductsService {
         _id: new Types.ObjectId(),
         name,
         normalizeName,
-        slug: `${makeSlug(normalizeName.toLowerCase())}-${randomString()}`,
+        slug: makeSlug(normalizeName),
         status,
         hiddenAt: status === EProductStatus.INACTIVE ? new Date() : null,
       });
@@ -92,13 +91,13 @@ export class ProductsService {
         } as CreatePriceHistoryDto),
       );
 
-      // Save product
-      await product.save();
-
       // Save image if have
       if (file) {
-        this.saveImage(product._id, file);
+        this.saveImageByProduct(product, file);
       }
+
+      // Save product
+      await product.save();
 
       await session.commitTransaction();
 
@@ -158,7 +157,10 @@ export class ProductsService {
           },
           limit: 1,
         },
-      } as PopulateOptions);
+      } as PopulateOptions)
+      .populate({
+        path: 'productImage',
+      });
 
     return { meta: pageMetaDto, list: products };
   }
@@ -174,7 +176,7 @@ export class ProductsService {
 
     if (isValidObjectId(id)) {
       filter._id = id;
-    } else if (regexPatterns.VALID_SLUG.test(id)) {
+    } else if (regexPatterns.SLUG_WITH_TIMESTAMP.test(id)) {
       filter.slug = id;
     } else {
       filter.name = id;
@@ -197,7 +199,7 @@ export class ProductsService {
 
     if (isValidObjectId(id)) {
       filter._id = id;
-    } else if (regexPatterns.VALID_SLUG.test(id)) {
+    } else if (regexPatterns.SLUG_WITH_TIMESTAMP.test(id)) {
       filter.slug = id;
     } else {
       filter.name = id;
@@ -214,7 +216,10 @@ export class ProductsService {
           },
           limit: 1,
         },
-      } as PopulateOptions);
+      } as PopulateOptions)
+      .populate({
+        path: 'productImage',
+      });
 
     if (!product) {
       throw new NotFoundException(MESSAGE_ERROR.PRODUCT_NOT_FOUND);
@@ -257,6 +262,12 @@ export class ProductsService {
         { new: true },
       );
 
+      if (updateProductDto.name) {
+        const normalizeName = removeAccents(updateProductDto.name);
+        updatedProduct.normalizeName = normalizeName;
+        updatedProduct.slug = makeSlug(normalizeName) + '-' + Date.now();
+      }
+
       // Check 1 of variable provided, add to price histories
       if (marketPrice && salePrice) {
         updatedProduct.priceHistories.push(
@@ -273,7 +284,7 @@ export class ProductsService {
 
       // Save image if have
       if (file) {
-        this.saveImage(updatedProduct._id, file);
+        this.saveImageByProduct(updatedProduct, file);
       }
 
       await session.commitTransaction();
@@ -384,7 +395,7 @@ export class ProductsService {
 
     const product = await this.productModel
       .exists({
-        name,
+        $or: [{ name }, { slug: makeSlug(removeAccents(name)) }],
         ...extras,
       })
       .select('name');
@@ -397,15 +408,15 @@ export class ProductsService {
    * @param product
    * @param file
    */
-  private async saveImage(
-    id: string,
+  private async saveImageByProduct(
+    product: Product,
     file: Express.Multer.File,
   ): Promise<void> {
     const JOB_NAME = 'UPLOAD_PRODUCT_IMAGE';
     const fileName = `${uuidv4()}-${new Date().getTime()}`;
     const uploadInfo: UploadBufferFile = {
       file: file.buffer,
-      folder: `products/${id}`,
+      folder: `products/${product._id}`,
       fileName,
       resourceType: 'image',
     };
@@ -413,15 +424,16 @@ export class ProductsService {
     this.cloudinaryService
       .uploadBuffer(JOB_NAME, uploadInfo)
       .then(async (result) => {
-        await this.productModel.findByIdAndUpdate(id, {
-          image: result.url,
-        });
         const segments = result.url.split('/');
         const indexInsertOptions = segments.indexOf(`v${result.version}`);
 
-        await this.productImageModel.create({
+        await this.productImageModel.findOneAndDelete({
+          product: product._id,
+        });
+
+        const productImage = await this.productImageModel.create({
           _id: new Types.ObjectId(),
-          product: id,
+          product,
           bytes: result.bytes,
           displayName: fileName,
           format: result.format,
@@ -436,6 +448,10 @@ export class ProductsService {
             CROP_IMAGE_OPTIONS.SMALL,
             indexInsertOptions,
           ).join('/'),
+        });
+
+        await this.productModel.findByIdAndUpdate(product._id, {
+          productImage,
         });
       })
       .catch((err) => {

@@ -81,7 +81,7 @@ export class ProductsController {
     const data = await this.productsService.update(id, updateProductDto, file);
     return {
       statusCode: HttpStatus.OK,
-      message: MESSAGE_SUCCESS.UPDATE_USER_SUCCESS,
+      message: MESSAGE_SUCCESS.UPDATE_PRODUCT_SUCCESS,
       data,
     };
   }

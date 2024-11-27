@@ -2,6 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument } from 'mongoose';
 import { EProductStatus } from 'src/constants/common';
 import { PriceHistory } from 'src/price-histories/schemas/price-history.schema';
+import { ProductImage } from './product-image.schema';
 
 export type ProductDocument = HydratedDocument<Product>;
 
@@ -37,8 +38,8 @@ export class Product {
   @Prop({ type: String, required: true, default: EProductStatus.ACTIVE })
   status: EProductStatus;
 
-  @Prop({ type: String, maxLength: 300 })
-  image: string;
+  @Prop({ type: mongoose.Schema.ObjectId, ref: 'ProductImage' })
+  productImage?: ProductImage;
 
   @Prop({ type: [{ type: mongoose.Schema.ObjectId, ref: 'PriceHistory' }] })
   priceHistories: PriceHistory[];
