@@ -176,7 +176,7 @@ export class ProductsService {
 
     if (isValidObjectId(id)) {
       filter._id = id;
-    } else if (regexPatterns.SLUG_WITH_TIMESTAMP.test(id)) {
+    } else if (regexPatterns.VALID_SLUG.test(id)) {
       filter.slug = id;
     } else {
       filter.name = id;
@@ -199,7 +199,7 @@ export class ProductsService {
 
     if (isValidObjectId(id)) {
       filter._id = id;
-    } else if (regexPatterns.SLUG_WITH_TIMESTAMP.test(id)) {
+    } else if (regexPatterns.VALID_SLUG.test(id)) {
       filter.slug = id;
     } else {
       filter.name = id;
@@ -265,7 +265,7 @@ export class ProductsService {
       if (updateProductDto.name) {
         const normalizeName = removeAccents(updateProductDto.name);
         updatedProduct.normalizeName = normalizeName;
-        updatedProduct.slug = makeSlug(normalizeName) + '-' + Date.now();
+        updatedProduct.slug = makeSlug(normalizeName);
       }
 
       // Check 1 of variable provided, add to price histories
@@ -345,13 +345,6 @@ export class ProductsService {
     if (!product) {
       throw new NotFoundException(MESSAGE_ERROR.PRODUCT_NOT_FOUND);
     }
-
-    if (product.priceHistories && product.priceHistories.length > 0) {
-      throw new BadRequestException(
-        MESSAGE_ERROR.PRODUCT_CONTAINS_PRICE_HISTORY,
-      );
-    }
-
     return await this.productModel.findByIdAndDelete(id);
   }
 
