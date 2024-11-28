@@ -20,34 +20,23 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { FindAllProductDto } from './dto/find-all-product.dto';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Product } from './schemas/product.schema';
-import {
-  CloudinaryService,
-  CROP_IMAGE_OPTIONS,
-  UploadBufferFile,
-} from 'src/cloudinary/cloudinary.service';
 import { MESSAGE_ERROR } from 'src/constants/messages';
 import { EProductStatus, PER_PAGE } from 'src/constants/common';
 import { PageMetaDto } from 'src/dtos/page-meta.dto';
 import { PriceHistoriesService } from 'src/price-histories/price-histories.service';
 import { CreatePriceHistoryDto } from 'src/price-histories/dto/create-price-history.dto';
-import {
-  insertValToArr,
-  makeSlug,
-  removeAccents,
-} from 'src/utils/string.utils';
+import { makeSlug, removeAccents } from 'src/utils/string.utils';
 import regexPatterns from 'src/constants/regex-patterns';
-import { v4 as uuidv4 } from 'uuid';
-import { ProductImage } from './schemas/product-image.schema';
+import { ProductImageService } from 'src/product-image/product-image.service';
+import { log } from 'console';
 
 @Injectable()
 export class ProductsService {
   constructor(
     @InjectModel(Product.name) private productModel: Model<Product>,
-    @InjectModel(ProductImage.name)
-    private productImageModel: Model<ProductImage>,
     @Inject(forwardRef(() => PriceHistoriesService))
     private readonly priceHistoriesService: PriceHistoriesService,
-    private readonly cloudinaryService: CloudinaryService,
+    private readonly productImageService: ProductImageService,
     @InjectConnection() private readonly connection: Connection,
   ) {}
 
@@ -93,7 +82,11 @@ export class ProductsService {
 
       // Save image if have
       if (file) {
-        this.saveImageByProduct(product, file);
+        const productImage = await this.productImageService.create(
+          product._id,
+          file,
+        );
+        product.productImage = productImage;
       }
 
       // Save product
@@ -240,11 +233,14 @@ export class ProductsService {
     updateProductDto: UpdateProductDto,
     file?: Express.Multer.File,
   ): Promise<Product> {
+    console.log(updateProductDto);
+
     if (await this.isExistName(updateProductDto.name, id)) {
       throw new BadRequestException(MESSAGE_ERROR.PRODUCT_NAME_EXIST);
     }
 
-    if (!(await this.findOne(id, '_id'))) {
+    const productWithLatestPrice = await this.findOneWithLatestPrice(id);
+    if (!productWithLatestPrice) {
       throw new NotFoundException(MESSAGE_ERROR.PRODUCT_NOT_FOUND);
     }
 
@@ -252,40 +248,70 @@ export class ProductsService {
     const { name, marketPrice, salePrice } = updateProductDto;
     try {
       session.startTransaction();
+      let normalizeName = null;
+      let slug = null;
+      if (updateProductDto.name) {
+        normalizeName = removeAccents(updateProductDto.name);
+        slug = makeSlug(normalizeName);
+      }
 
-      // Update product
+      // Update name
       const updatedProduct = await this.productModel.findByIdAndUpdate(
         id,
         {
-          name,
+          ...(updateProductDto.name ? { name, slug, normalizeName } : {}),
+          ...(updateProductDto.status === EProductStatus.ACTIVE
+            ? {
+                hiddenAt: null,
+                status: EProductStatus.ACTIVE,
+              }
+            : { hiddenAt: new Date(), status: EProductStatus.INACTIVE }),
         },
         { new: true },
       );
 
-      if (updateProductDto.name) {
-        const normalizeName = removeAccents(updateProductDto.name);
-        updatedProduct.normalizeName = normalizeName;
-        updatedProduct.slug = makeSlug(normalizeName);
-      }
-
       // Check 1 of variable provided, add to price histories
-      if (marketPrice && salePrice) {
+      if (marketPrice || salePrice) {
         updatedProduct.priceHistories.push(
           await this.priceHistoriesService.create({
-            marketPrice,
-            salePrice,
+            ...(marketPrice
+              ? {
+                  marketPrice,
+                  salePrice: productWithLatestPrice.priceHistories[0].salePrice,
+                }
+              : {}),
+            ...(salePrice
+              ? {
+                  salePrice,
+                  marketPrice:
+                    productWithLatestPrice.priceHistories[0].marketPrice,
+                }
+              : {}),
             product: id,
             valuationAt: new Date(),
           } as CreatePriceHistoryDto),
         );
       }
 
-      await updatedProduct.save();
-
-      // Save image if have
+      // Replace image if have
       if (file) {
-        this.saveImageByProduct(updatedProduct, file);
+        const productImage = await this.productImageService.findOneByProductId(
+          updatedProduct._id,
+        );
+
+        // Remove current image
+        await this.productImageService.removeByPublicId(productImage.publicId);
+
+        // Create new image
+        const newProductImage = await this.productImageService.create(
+          updatedProduct._id,
+          file,
+        );
+
+        updatedProduct.productImage = newProductImage;
       }
+
+      await updatedProduct.save();
 
       await session.commitTransaction();
       return updatedProduct;
@@ -345,6 +371,15 @@ export class ProductsService {
     if (!product) {
       throw new NotFoundException(MESSAGE_ERROR.PRODUCT_NOT_FOUND);
     }
+
+    const productImage = await this.productImageService.findOneByProductId(
+      product._id,
+    );
+
+    if (productImage) {
+      await this.productImageService.removeByPublicId(productImage.publicId);
+    }
+
     return await this.productModel.findByIdAndDelete(id);
   }
 
@@ -394,61 +429,5 @@ export class ProductsService {
       .select('name');
 
     return !!product;
-  }
-
-  /**
-   * Save product image
-   * @param product
-   * @param file
-   */
-  private async saveImageByProduct(
-    product: Product,
-    file: Express.Multer.File,
-  ): Promise<void> {
-    const JOB_NAME = 'UPLOAD_PRODUCT_IMAGE';
-    const fileName = `${uuidv4()}-${new Date().getTime()}`;
-    const uploadInfo: UploadBufferFile = {
-      file: file.buffer,
-      folder: `products/${product._id}`,
-      fileName,
-      resourceType: 'image',
-    };
-
-    this.cloudinaryService
-      .uploadBuffer(JOB_NAME, uploadInfo)
-      .then(async (result) => {
-        const segments = result.url.split('/');
-        const indexInsertOptions = segments.indexOf(`v${result.version}`);
-
-        await this.productImageModel.findOneAndDelete({
-          product: product._id,
-        });
-
-        const productImage = await this.productImageModel.create({
-          _id: new Types.ObjectId(),
-          product,
-          bytes: result.bytes,
-          displayName: fileName,
-          format: result.format,
-          originalPath: result.url,
-          mediumPath: insertValToArr(
-            segments,
-            CROP_IMAGE_OPTIONS.MEDIUM,
-            indexInsertOptions,
-          ).join('/'),
-          smallPath: insertValToArr(
-            segments,
-            CROP_IMAGE_OPTIONS.SMALL,
-            indexInsertOptions,
-          ).join('/'),
-        });
-
-        await this.productModel.findByIdAndUpdate(product._id, {
-          productImage,
-        });
-      })
-      .catch((err) => {
-        // Send error
-      });
   }
 }

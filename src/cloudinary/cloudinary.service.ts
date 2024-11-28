@@ -82,4 +82,17 @@ export class CloudinaryService {
         .catch((err) => reject(err));
     });
   }
+
+  async removeFile(jobName: string, publicId: string): Promise<any> {
+    const job = await this.uploadQueue.add(jobName, { publicId });
+    return new Promise((resolve, reject) => {
+      cloudinary.uploader
+        .destroy(publicId)
+        .then(async (result) => {
+          await job.remove();
+          resolve(result);
+        })
+        .catch((err) => reject(err));
+    });
+  }
 }

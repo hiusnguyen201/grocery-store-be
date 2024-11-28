@@ -2,7 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument } from 'mongoose';
 import { EProductStatus } from 'src/constants/common';
 import { PriceHistory } from 'src/price-histories/schemas/price-history.schema';
-import { ProductImage } from './product-image.schema';
+import { ProductImage } from 'src/product-image/schemas/product-image.schema';
 
 export type ProductDocument = HydratedDocument<Product>;
 

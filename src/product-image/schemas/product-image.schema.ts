@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument } from 'mongoose';
-import { Product } from './product.schema';
+import { Product } from 'src/products/schemas/product.schema';
 
 export type ProductImageDocument = HydratedDocument<ProductImage>;
 
@@ -11,6 +11,13 @@ export class ProductImage {
 
   @Prop({ type: mongoose.Schema.ObjectId, required: true, ref: 'Product' })
   product: Product;
+
+  @Prop({
+    type: String,
+    required: true,
+    maxLength: 200,
+  })
+  publicId: string;
 
   @Prop({
     type: String,
